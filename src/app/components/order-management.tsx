@@ -44,7 +44,7 @@ const mockOrders: Order[] = [
     id: "ORD-001",
     customerName: "สมชาย ใจดี",
     lineId: "LINE-123456",
-    lineAccount: "Store Account 1",
+    lineAccount: "ตองสามเมล็ดพันธุ์",
     products: ["Product A", "Product B"],
     quantity: 150,
     totalAmount: 45000,
@@ -55,7 +55,7 @@ const mockOrders: Order[] = [
     id: "ORD-002",
     customerName: "สมหญิง รักสวย",
     lineId: "LINE-789012",
-    lineAccount: "Store Account 2",
+    lineAccount: "สามเอเมล็ดพันธุ์",
     products: ["Product C"],
     quantity: 200,
     totalAmount: 80000,
@@ -66,7 +66,7 @@ const mockOrders: Order[] = [
     id: "ORD-003",
     customerName: "วิชัย ประเสริฐ",
     lineId: "LINE-345678",
-    lineAccount: "Store Account 3",
+    lineAccount: "สี่ทิศเมล็ดพันธุ์",
     products: ["Product A", "Product D"],
     quantity: 100,
     totalAmount: 35000,
@@ -77,7 +77,7 @@ const mockOrders: Order[] = [
     id: "ORD-004",
     customerName: "นภา สุขใจ",
     lineId: "LINE-901234",
-    lineAccount: "Store Account 1",
+    lineAccount: "ตองสามเมล็ดพันธุ์",
     products: ["Product B", "Product C", "Product D"],
     quantity: 300,
     totalAmount: 120000,
@@ -88,7 +88,7 @@ const mockOrders: Order[] = [
     id: "ORD-005",
     customerName: "ธนา มั่งมี",
     lineId: "LINE-567890",
-    lineAccount: "Store Account 2",
+    lineAccount: "สามเอเมล็ดพันธุ์",
     products: ["Product A"],
     quantity: 50,
     totalAmount: 15000,
@@ -213,9 +213,9 @@ export function OrderManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Accounts</SelectItem>
-                <SelectItem value="Store Account 1">Store Account 1</SelectItem>
-                <SelectItem value="Store Account 2">Store Account 2</SelectItem>
-                <SelectItem value="Store Account 3">Store Account 3</SelectItem>
+                <SelectItem value="ตองสามเมล็ดพันธุ์">ตองสามเมล็ดพันธุ์</SelectItem>
+                <SelectItem value="สามเอเมล็ดพันธุ์">สามเอเมล็ดพันธุ์</SelectItem>
+                <SelectItem value="สี่ทิศเมล็ดพันธุ์">สี่ทิศเมล็ดพันธุ์</SelectItem>
               </SelectContent>
             </Select>
           </div>

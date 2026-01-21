@@ -18,14 +18,14 @@ export function AdminDashboard() {
             <div className="flex items-center gap-3">
               <MessageSquare className="h-8 w-8" />
               <div>
-                <h1 className="text-xl font-semibold">LINE@ Admin Dashboard</h1>
-                <p className="text-sm text-gray-400">Bulk Order Management System</p>
+                <h1 className="text-xl font-semibold">CSS Admin Back office</h1>
+                <p className="text-sm text-gray-400">Order Management System</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm">Connected Accounts: 3</p>
-                <p className="text-xs text-gray-400">Store 1, Store 2, Store 3</p>
+                <p className="text-xs text-gray-400">ตองสามเมล็ดพันธุ์, สามเอเมล็ดพันธุ์, สี่ทิศเมล็ดพันธุ์</p>
               </div>
             </div>
           </div>
