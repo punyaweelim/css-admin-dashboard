@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Search, UserPlus, Edit, Trash2 } from "lucide-react";
+import { Users, Search, UserPlus, Edit, Trash2, ArrowLeft, ShoppingCart, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -21,6 +21,15 @@ import {
 } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 
+interface Order {
+  id: string;
+  date: string;
+  products: string[];
+  quantity: number;
+  amount: number;
+  status: string;
+}
+
 interface Customer {
   id: string;
   name: string;
@@ -32,6 +41,8 @@ interface Customer {
   totalSpent: number;
   registeredDate: string;
   status: "active" | "inactive";
+  recentOrders?: Order[];
+  topProducts?: { name: string; quantity: number; times: number }[];
 }
 
 const mockCustomers: Customer[] = [
@@ -46,6 +57,41 @@ const mockCustomers: Customer[] = [
     totalSpent: 125000,
     registeredDate: "2025-11-15",
     status: "active",
+    recentOrders: [
+      {
+        id: "ORD-001",
+        date: "2025-11-15",
+        products: ["Product A", "Product B"],
+        quantity: 2,
+        amount: 50000,
+        status: "completed",
+      },
+      {
+        id: "ORD-002",
+        date: "2025-11-16",
+        products: ["Product C"],
+        quantity: 1,
+        amount: 25000,
+        status: "completed",
+      },
+    ],
+    topProducts: [
+      {
+        name: "Product A",
+        quantity: 10,
+        times: 2,
+      },
+      {
+        name: "Product B",
+        quantity: 5,
+        times: 2,
+      },
+      {
+        name: "Product C",
+        quantity: 3,
+        times: 1,
+      },
+    ],
   },
   {
     id: "CUST-002",
@@ -58,6 +104,41 @@ const mockCustomers: Customer[] = [
     totalSpent: 240000,
     registeredDate: "2025-10-20",
     status: "active",
+    recentOrders: [
+      {
+        id: "ORD-003",
+        date: "2025-10-20",
+        products: ["Product D", "Product E"],
+        quantity: 3,
+        amount: 75000,
+        status: "completed",
+      },
+      {
+        id: "ORD-004",
+        date: "2025-10-21",
+        products: ["Product F"],
+        quantity: 1,
+        amount: 45000,
+        status: "completed",
+      },
+    ],
+    topProducts: [
+      {
+        name: "Product D",
+        quantity: 15,
+        times: 3,
+      },
+      {
+        name: "Product E",
+        quantity: 10,
+        times: 3,
+      },
+      {
+        name: "Product F",
+        quantity: 5,
+        times: 1,
+      },
+    ],
   },
   {
     id: "CUST-003",
@@ -70,6 +151,36 @@ const mockCustomers: Customer[] = [
     totalSpent: 85000,
     registeredDate: "2025-12-01",
     status: "active",
+    recentOrders: [
+      {
+        id: "ORD-005",
+        date: "2025-12-01",
+        products: ["Product G"],
+        quantity: 1,
+        amount: 25000,
+        status: "completed",
+      },
+      {
+        id: "ORD-006",
+        date: "2025-12-02",
+        products: ["Product H"],
+        quantity: 1,
+        amount: 30000,
+        status: "completed",
+      },
+    ],
+    topProducts: [
+      {
+        name: "Product G",
+        quantity: 5,
+        times: 1,
+      },
+      {
+        name: "Product H",
+        quantity: 4,
+        times: 1,
+      },
+    ],
   },
   {
     id: "CUST-004",
@@ -82,6 +193,41 @@ const mockCustomers: Customer[] = [
     totalSpent: 360000,
     registeredDate: "2025-09-10",
     status: "active",
+    recentOrders: [
+      {
+        id: "ORD-007",
+        date: "2025-09-10",
+        products: ["Product I", "Product J"],
+        quantity: 4,
+        amount: 100000,
+        status: "completed",
+      },
+      {
+        id: "ORD-008",
+        date: "2025-09-11",
+        products: ["Product K"],
+        quantity: 1,
+        amount: 60000,
+        status: "completed",
+      },
+    ],
+    topProducts: [
+      {
+        name: "Product I",
+        quantity: 20,
+        times: 4,
+      },
+      {
+        name: "Product J",
+        quantity: 15,
+        times: 4,
+      },
+      {
+        name: "Product K",
+        quantity: 10,
+        times: 1,
+      },
+    ],
   },
   {
     id: "CUST-005",
@@ -94,6 +240,23 @@ const mockCustomers: Customer[] = [
     totalSpent: 15000,
     registeredDate: "2026-01-05",
     status: "inactive",
+    recentOrders: [
+      {
+        id: "ORD-009",
+        date: "2026-01-05",
+        products: ["Product L"],
+        quantity: 1,
+        amount: 15000,
+        status: "completed",
+      },
+    ],
+    topProducts: [
+      {
+        name: "Product L",
+        quantity: 5,
+        times: 1,
+      },
+    ],
   },
 ];
 
@@ -102,6 +265,8 @@ export function CustomerManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "detail">("list");
+  const [customerDetail, setCustomerDetail] = useState<Customer | null>(null);
 
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
@@ -118,6 +283,154 @@ export function CustomerManagement() {
     inactive: customers.filter((c) => c.status === "inactive").length,
     totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
   };
+
+  const handleRowClick = (customer: Customer) => {
+    setCustomerDetail(customer);
+    setViewMode("detail");
+  };
+
+  const handleBackToList = () => {
+    setViewMode("list");
+    setCustomerDetail(null);
+  };
+
+  if (viewMode === "detail" && customerDetail) {
+    return (
+      <div className="space-y-6">
+        {/* Back Button */}
+        <Button variant="ghost" onClick={handleBackToList}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Customers
+        </Button>
+
+        {/* Customer Header */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>{customerDetail.name}</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {customerDetail.id} • {customerDetail.lineAccount}
+                </p>
+              </div>
+              <Badge
+                className={
+                  customerDetail.status === "active"
+                    ? "bg-black text-white"
+                    : "bg-white text-black border border-black"
+                }
+                variant="secondary"
+              >
+                {customerDetail.status}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="text-sm text-muted-foreground mb-2">Contact Information</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">LINE ID</p>
+                    <p className="font-mono">{customerDetail.lineId}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Phone</p>
+                    <p>{customerDetail.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p>{customerDetail.email}</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm text-muted-foreground mb-2">Statistics</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Orders</p>
+                    <p className="text-2xl font-bold">{customerDetail.totalOrders}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Spent</p>
+                    <p className="text-2xl font-bold">฿{customerDetail.totalSpent.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Member Since</p>
+                    <p>{customerDetail.registeredDate}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Recent Orders */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Recent Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {customerDetail.recentOrders && customerDetail.recentOrders.length > 0 ? (
+                  customerDetail.recentOrders.map((order) => (
+                    <div key={order.id} className="border-b border-border pb-4 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-mono text-sm">{order.id}</p>
+                        <Badge variant="secondary" className="bg-black text-white">
+                          {order.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{order.date}</p>
+                      <p className="text-sm mt-1">{order.products.join(", ")}</p>
+                      <p className="font-semibold mt-2">฿{order.amount.toLocaleString()}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No recent orders</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Most Ordered Products */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Most Ordered Products
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {customerDetail.topProducts && customerDetail.topProducts.length > 0 ? (
+                  customerDetail.topProducts.map((product, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Ordered {product.times} time{product.times > 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{product.quantity} units</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No product data</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -232,7 +545,11 @@ export function CustomerManagement() {
             </TableHeader>
             <TableBody>
               {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow 
+                  key={customer.id} 
+                  onClick={() => handleRowClick(customer)}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <TableCell className="font-mono">{customer.id}</TableCell>
                   <TableCell>{customer.name}</TableCell>
                   <TableCell className="font-mono text-sm">{customer.lineId}</TableCell>
@@ -254,7 +571,7 @@ export function CustomerManagement() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button

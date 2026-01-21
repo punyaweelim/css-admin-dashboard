@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ShoppingBag, Search, Plus, Edit, Trash2 } from "lucide-react";
+import { ShoppingBag, Search, Plus, Edit, Trash2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 
 interface Product {
   id: string;
@@ -31,6 +32,7 @@ interface Product {
   stock: number;
   minOrder: number;
   description: string;
+  imageUrl?: string;
   status: "available" | "low stock" | "out of stock";
 }
 
@@ -44,6 +46,7 @@ const mockProducts: Product[] = [
     stock: 500,
     minOrder: 50,
     description: "High-quality electronic product suitable for bulk orders",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
     status: "available",
   },
   {
@@ -55,6 +58,7 @@ const mockProducts: Product[] = [
     stock: 200,
     minOrder: 100,
     description: "Popular home and garden item with excellent reviews",
+    imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
     status: "available",
   },
   {
@@ -66,6 +70,7 @@ const mockProducts: Product[] = [
     stock: 50,
     minOrder: 25,
     description: "Trendy fashion product perfect for resellers",
+    imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
     status: "low stock",
   },
   {
@@ -77,6 +82,7 @@ const mockProducts: Product[] = [
     stock: 0,
     minOrder: 50,
     description: "Premium beauty product - currently restocking",
+    imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
     status: "out of stock",
   },
   {
@@ -88,6 +94,7 @@ const mockProducts: Product[] = [
     stock: 1000,
     minOrder: 30,
     description: "Best-selling electronic gadget with warranty",
+    imageUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400",
     status: "available",
   },
 ];
@@ -185,6 +192,18 @@ export function ProductManagement() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
+                    <Label>Product Image</Label>
+                    <div className="flex items-center gap-4">
+                      <Button variant="outline" className="w-full">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Image
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upload product image (JPG, PNG)
+                    </p>
+                  </div>
+                  <div>
                     <Label>Product Name</Label>
                     <Input placeholder="Enter product name" />
                   </div>
@@ -235,6 +254,7 @@ export function ProductManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Image</TableHead>
                 <TableHead>Product ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>SKU</TableHead>
@@ -249,6 +269,17 @@ export function ProductManagement() {
             <TableBody>
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
+                  <TableCell>
+                    <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden">
+                      {product.imageUrl && (
+                        <ImageWithFallback
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono">{product.id}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>
