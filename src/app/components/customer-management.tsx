@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Search, UserPlus, Edit, Trash2, ArrowLeft, ShoppingCart, TrendingUp } from "lucide-react";
+import { Users, Search, UserPlus, Edit, Trash2, ArrowLeft, ShoppingCart, TrendingUp, Award } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -20,6 +20,15 @@ import {
   DialogTrigger,
 } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+
+type CustomerTier = "bronze" | "silver" | "gold" | "platinum";
 
 interface Order {
   id: string;
@@ -37,6 +46,7 @@ interface Customer {
   lineAccount: string;
   phone: string;
   email: string;
+  tier: CustomerTier;
   totalOrders: number;
   totalSpent: number;
   registeredDate: string;
@@ -45,14 +55,22 @@ interface Customer {
   topProducts?: { name: string; quantity: number; times: number }[];
 }
 
+const tierInfo: Record<CustomerTier, { emoji: string; name: string; color: string; bg: string }> = {
+  bronze: { emoji: "🥉", name: "Bronze", color: "text-orange-700", bg: "bg-orange-100" },
+  silver: { emoji: "🥈", name: "Silver", color: "text-gray-700", bg: "bg-gray-100" },
+  gold: { emoji: "🥇", name: "Gold", color: "text-yellow-700", bg: "bg-yellow-100" },
+  platinum: { emoji: "💎", name: "Platinum", color: "text-purple-700", bg: "bg-purple-100" },
+};
+
 const mockCustomers: Customer[] = [
   {
     id: "CUST-001",
     name: "สมชาย ใจดี",
     lineId: "LINE-123456",
-    lineAccount: "ตองสามเมล็ดพันธุ์",
+    lineAccount: "Store Account 1",
     phone: "081-234-5678",
     email: "somchai@example.com",
+    tier: "gold",
     totalOrders: 5,
     totalSpent: 125000,
     registeredDate: "2025-11-15",
@@ -97,9 +115,10 @@ const mockCustomers: Customer[] = [
     id: "CUST-002",
     name: "สมหญิง รักสวย",
     lineId: "LINE-789012",
-    lineAccount: "สามเอเมล็ดพันธุ์",
+    lineAccount: "Store Account 2",
     phone: "082-345-6789",
     email: "somying@example.com",
+    tier: "platinum",
     totalOrders: 8,
     totalSpent: 240000,
     registeredDate: "2025-10-20",
@@ -144,9 +163,10 @@ const mockCustomers: Customer[] = [
     id: "CUST-003",
     name: "วิชัย ประเสริฐ",
     lineId: "LINE-345678",
-    lineAccount: "สี่ทิศเมล็ดพันธุ์",
+    lineAccount: "Store Account 3",
     phone: "083-456-7890",
     email: "wichai@example.com",
+    tier: "silver",
     totalOrders: 3,
     totalSpent: 85000,
     registeredDate: "2025-12-01",
@@ -156,104 +176,45 @@ const mockCustomers: Customer[] = [
         id: "ORD-005",
         date: "2025-12-01",
         products: ["Product G"],
-        quantity: 1,
-        amount: 25000,
-        status: "completed",
-      },
-      {
-        id: "ORD-006",
-        date: "2025-12-02",
-        products: ["Product H"],
-        quantity: 1,
-        amount: 30000,
+        quantity: 2,
+        amount: 40000,
         status: "completed",
       },
     ],
     topProducts: [
       {
         name: "Product G",
-        quantity: 5,
-        times: 1,
-      },
-      {
-        name: "Product H",
-        quantity: 4,
-        times: 1,
+        quantity: 8,
+        times: 2,
       },
     ],
   },
   {
     id: "CUST-004",
-    name: "นภา สุขใจ",
+    name: "อรุณี สวัสดี",
     lineId: "LINE-901234",
-    lineAccount: "ตองสามเมล็ดพันธุ์",
+    lineAccount: "Store Account 1",
     phone: "084-567-8901",
-    email: "napa@example.com",
-    totalOrders: 12,
-    totalSpent: 360000,
-    registeredDate: "2025-09-10",
+    email: "arunee@example.com",
+    tier: "bronze",
+    totalOrders: 1,
+    totalSpent: 25000,
+    registeredDate: "2026-01-10",
     status: "active",
     recentOrders: [
       {
-        id: "ORD-007",
-        date: "2025-09-10",
-        products: ["Product I", "Product J"],
-        quantity: 4,
-        amount: 100000,
-        status: "completed",
-      },
-      {
-        id: "ORD-008",
-        date: "2025-09-11",
-        products: ["Product K"],
+        id: "ORD-006",
+        date: "2026-01-10",
+        products: ["Product H"],
         quantity: 1,
-        amount: 60000,
+        amount: 25000,
         status: "completed",
       },
     ],
     topProducts: [
       {
-        name: "Product I",
-        quantity: 20,
-        times: 4,
-      },
-      {
-        name: "Product J",
-        quantity: 15,
-        times: 4,
-      },
-      {
-        name: "Product K",
-        quantity: 10,
-        times: 1,
-      },
-    ],
-  },
-  {
-    id: "CUST-005",
-    name: "ธนา มั่งมี",
-    lineId: "LINE-567890",
-    lineAccount: "สามเอเมล็ดพันธุ์",
-    phone: "085-678-9012",
-    email: "thana@example.com",
-    totalOrders: 1,
-    totalSpent: 15000,
-    registeredDate: "2026-01-05",
-    status: "inactive",
-    recentOrders: [
-      {
-        id: "ORD-009",
-        date: "2026-01-05",
-        products: ["Product L"],
-        quantity: 1,
-        amount: 15000,
-        status: "completed",
-      },
-    ],
-    topProducts: [
-      {
-        name: "Product L",
-        quantity: 5,
+        name: "Product H",
+        quantity: 3,
         times: 1,
       },
     ],
@@ -261,172 +222,335 @@ const mockCustomers: Customer[] = [
 ];
 
 export function CustomerManagement() {
-  const [customers] = useState<Customer[]>(mockCustomers);
+  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "detail">("list");
-  const [customerDetail, setCustomerDetail] = useState<Customer | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch =
+  const filteredCustomers = customers.filter(
+    (customer) =>
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.lineId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.includes(searchTerm) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const stats = {
-    total: customers.length,
-    active: customers.filter((c) => c.status === "active").length,
-    inactive: customers.filter((c) => c.status === "inactive").length,
-    totalRevenue: customers.reduce((sum, c) => sum + c.totalSpent, 0),
+  const handleAddCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newCustomer: Customer = {
+      id: `CUST-${String(customers.length + 1).padStart(3, "0")}`,
+      name: formData.get("name") as string,
+      lineId: formData.get("lineId") as string,
+      lineAccount: formData.get("lineAccount") as string,
+      phone: formData.get("phone") as string,
+      email: formData.get("email") as string,
+      tier: formData.get("tier") as CustomerTier,
+      totalOrders: 0,
+      totalSpent: 0,
+      registeredDate: new Date().toISOString().split("T")[0],
+      status: "active",
+    };
+    setCustomers([...customers, newCustomer]);
+    setIsAddDialogOpen(false);
   };
 
-  const handleRowClick = (customer: Customer) => {
-    setCustomerDetail(customer);
-    setViewMode("detail");
+  const handleEditCustomer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    const formData = new FormData(e.currentTarget);
+    const updatedCustomer: Customer = {
+      ...editingCustomer,
+      name: formData.get("name") as string,
+      lineId: formData.get("lineId") as string,
+      lineAccount: formData.get("lineAccount") as string,
+      phone: formData.get("phone") as string,
+      email: formData.get("email") as string,
+      tier: formData.get("tier") as CustomerTier,
+      status: formData.get("status") as "active" | "inactive",
+    };
+    setCustomers(
+      customers.map((c) => (c.id === editingCustomer.id ? updatedCustomer : c))
+    );
+    setEditingCustomer(null);
   };
 
-  const handleBackToList = () => {
-    setViewMode("list");
-    setCustomerDetail(null);
+  const handleDeleteCustomer = (id: string) => {
+    setCustomers(customers.filter((c) => c.id !== id));
   };
 
-  if (viewMode === "detail" && customerDetail) {
+  const CustomerForm = ({ customer }: { customer?: Customer }) => (
+    <form
+      onSubmit={customer ? handleEditCustomer : handleAddCustomer}
+      className="space-y-4"
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={customer?.name}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="lineId">LINE ID</Label>
+          <Input
+            id="lineId"
+            name="lineId"
+            defaultValue={customer?.lineId}
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="lineAccount">LINE@ Account</Label>
+        <Select
+          name="lineAccount"
+          defaultValue={customer?.lineAccount || "Store Account 1"}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select account" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Store Account 1">Store Account 1</SelectItem>
+            <SelectItem value="Store Account 2">Store Account 2</SelectItem>
+            <SelectItem value="Store Account 3">Store Account 3</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            name="phone"
+            defaultValue={customer?.phone}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            defaultValue={customer?.email}
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="tier">Membership Tier</Label>
+        <Select name="tier" defaultValue={customer?.tier || "bronze"}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select tier" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(tierInfo).map(([tier, info]) => (
+              <SelectItem key={tier} value={tier}>
+                <div className="flex items-center gap-2">
+                  <span>{info.emoji}</span>
+                  <span>{info.name}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {customer && (
+        <div>
+          <Label htmlFor="status">Status</Label>
+          <Select name="status" defaultValue={customer.status}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setIsAddDialogOpen(false);
+            setEditingCustomer(null);
+          }}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" className="bg-black text-white hover:bg-gray-800">
+          {customer ? "Update" : "Add"} Customer
+        </Button>
+      </div>
+    </form>
+  );
+
+  if (selectedCustomer) {
     return (
       <div className="space-y-6">
         {/* Back Button */}
-        <Button variant="ghost" onClick={handleBackToList}>
+        <Button
+          variant="outline"
+          onClick={() => setSelectedCustomer(null)}
+          className="mb-4"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Customers
         </Button>
 
-        {/* Customer Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+        {/* Customer Detail */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Customer Info */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Customer Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <CardTitle>{customerDetail.name}</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {customerDetail.id} • {customerDetail.lineAccount}
+                <Label className="text-muted-foreground">Name</Label>
+                <p className="font-semibold">{selectedCustomer.name}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Membership Tier</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className={`${tierInfo[selectedCustomer.tier].bg} ${tierInfo[selectedCustomer.tier].color} border-0`}>
+                    <span className="mr-1">{tierInfo[selectedCustomer.tier].emoji}</span>
+                    {tierInfo[selectedCustomer.tier].name}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">LINE ID</Label>
+                <p className="font-semibold">{selectedCustomer.lineId}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">LINE@ Account</Label>
+                <p className="font-semibold">{selectedCustomer.lineAccount}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Phone</Label>
+                <p className="font-semibold">{selectedCustomer.phone}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Email</Label>
+                <p className="font-semibold">{selectedCustomer.email}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">Member Since</Label>
+                <p className="font-semibold">
+                  {new Date(selectedCustomer.registeredDate).toLocaleDateString()}
                 </p>
               </div>
-              <Badge
-                className={
-                  customerDetail.status === "active"
-                    ? "bg-black text-white"
-                    : "bg-white text-black border border-black"
-                }
-                variant="secondary"
-              >
-                {customerDetail.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h4 className="text-sm text-muted-foreground mb-2">Contact Information</h4>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">LINE ID</p>
-                    <p className="font-mono">{customerDetail.lineId}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p>{customerDetail.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p>{customerDetail.email}</p>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm text-muted-foreground mb-2">Statistics</h4>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total Orders</p>
-                    <p className="text-2xl font-bold">{customerDetail.totalOrders}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total Spent</p>
-                    <p className="text-2xl font-bold">฿{customerDetail.totalSpent.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Member Since</p>
-                    <p>{customerDetail.registeredDate}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Recent Orders */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Recent Orders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {customerDetail.recentOrders && customerDetail.recentOrders.length > 0 ? (
-                  customerDetail.recentOrders.map((order) => (
-                    <div key={order.id} className="border-b border-border pb-4 last:border-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-mono text-sm">{order.id}</p>
-                        <Badge variant="secondary" className="bg-black text-white">
-                          {order.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{order.date}</p>
-                      <p className="text-sm mt-1">{order.products.join(", ")}</p>
-                      <p className="font-semibold mt-2">฿{order.amount.toLocaleString()}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No recent orders</p>
-                )}
+                <Label className="text-muted-foreground">Status</Label>
+                <Badge
+                  variant="secondary"
+                  className={
+                    selectedCustomer.status === "active"
+                      ? "bg-black text-white"
+                      : "bg-gray-400 text-white"
+                  }
+                >
+                  {selectedCustomer.status}
+                </Badge>
               </div>
             </CardContent>
           </Card>
 
-          {/* Most Ordered Products */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Most Ordered Products
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {customerDetail.topProducts && customerDetail.topProducts.length > 0 ? (
-                  customerDetail.topProducts.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between">
+          {/* Stats and Orders */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-black/5 rounded-lg">
+                      <ShoppingCart className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Orders</p>
+                      <p className="text-2xl font-bold">{selectedCustomer.totalOrders}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-black/5 rounded-lg">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Spent</p>
+                      <p className="text-2xl font-bold">
+                        ฿{selectedCustomer.totalSpent.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Orders */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Orders</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {selectedCustomer.recentOrders?.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between p-4 border border-border rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium">{product.name}</p>
+                        <p className="font-semibold">{order.id}</p>
                         <p className="text-sm text-muted-foreground">
-                          Ordered {product.times} time{product.times > 1 ? "s" : ""}
+                          {new Date(order.date).toLocaleDateString()}
                         </p>
+                        <p className="text-sm mt-1">{order.products.join(", ")}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{product.quantity} units</p>
+                        <p className="font-semibold">฿{order.amount.toLocaleString()}</p>
+                        <Badge variant="outline">{order.status}</Badge>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No product data</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Products */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Most Ordered Products</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {selectedCustomer.topProducts?.map((product, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-semibold">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Ordered {product.times} times
+                        </p>
+                      </div>
+                      <Badge variant="secondary">{product.quantity} units</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
@@ -434,186 +558,171 @@ export function CustomerManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Customers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Inactive</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.inactive}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Revenue</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">฿{stats.totalRevenue.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Customer Table */}
+      {/* Header */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Customer Management
-            </CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Customer Management
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage customers and their membership tiers
+              </p>
+            </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="bg-black text-white hover:bg-gray-800">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add Customer
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Add New Customer</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Name</Label>
-                    <Input placeholder="Customer name" />
-                  </div>
-                  <div>
-                    <Label>LINE ID</Label>
-                    <Input placeholder="LINE-XXXXXX" />
-                  </div>
-                  <div>
-                    <Label>LINE Account</Label>
-                    <Input placeholder="Select account" />
-                  </div>
-                  <div>
-                    <Label>Phone</Label>
-                    <Input placeholder="0XX-XXX-XXXX" />
-                  </div>
-                  <div>
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="email@example.com" />
-                  </div>
-                  <Button className="w-full">Save Customer</Button>
-                </div>
+                <CustomerForm />
               </DialogContent>
             </Dialog>
           </div>
-          <div className="flex gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, LINE ID, phone, or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tier Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {Object.entries(tierInfo).map(([tier, info]) => {
+          const count = customers.filter((c) => c.tier === tier).length;
+          return (
+            <Card key={tier}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{info.emoji}</span>
+                    <div>
+                      <p className="text-sm text-muted-foreground">{info.name}</p>
+                      <p className="text-2xl font-bold">{count}</p>
+                    </div>
+                  </div>
+                  <Award className="h-8 w-8 text-muted-foreground/20" />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Customers Table */}
+      <Card>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Customer ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>LINE ID</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Customer Info</TableHead>
+                <TableHead>Tier</TableHead>
+                <TableHead>LINE Info</TableHead>
+                <TableHead>Contact</TableHead>
                 <TableHead>Orders</TableHead>
                 <TableHead>Total Spent</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCustomers.map((customer) => (
-                <TableRow 
-                  key={customer.id} 
-                  onClick={() => handleRowClick(customer)}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                <TableRow
+                  key={customer.id}
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => setSelectedCustomer(customer)}
                 >
-                  <TableCell className="font-mono">{customer.id}</TableCell>
-                  <TableCell>{customer.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{customer.lineId}</TableCell>
-                  <TableCell>{customer.lineAccount}</TableCell>
-                  <TableCell>{customer.phone}</TableCell>
-                  <TableCell>{customer.email}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-semibold">{customer.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {customer.id}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${tierInfo[customer.tier].bg} ${tierInfo[customer.tier].color} border-0`}>
+                      <span className="mr-1">{tierInfo[customer.tier].emoji}</span>
+                      {tierInfo[customer.tier].name}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm font-semibold">{customer.lineId}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {customer.lineAccount}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm">{customer.phone}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {customer.email}
+                      </div>
+                    </div>
+                  </TableCell>
                   <TableCell>{customer.totalOrders}</TableCell>
                   <TableCell>฿{customer.totalSpent.toLocaleString()}</TableCell>
                   <TableCell>
                     <Badge
+                      variant="secondary"
                       className={
                         customer.status === "active"
                           ? "bg-black text-white"
-                          : "bg-white text-black border border-black"
+                          : "bg-gray-400 text-white"
                       }
-                      variant="secondary"
                     >
                       {customer.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Dialog>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Dialog
+                        open={editingCustomer?.id === customer.id}
+                        onOpenChange={(open) => !open && setEditingCustomer(null)}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedCustomer(customer)}
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCustomer(customer);
+                            }}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-2xl">
                           <DialogHeader>
-                            <DialogTitle>Edit Customer: {selectedCustomer?.id}</DialogTitle>
+                            <DialogTitle>Edit Customer</DialogTitle>
                           </DialogHeader>
-                          {selectedCustomer && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label>Name</Label>
-                                <Input defaultValue={selectedCustomer.name} />
-                              </div>
-                              <div>
-                                <Label>LINE ID</Label>
-                                <Input defaultValue={selectedCustomer.lineId} />
-                              </div>
-                              <div>
-                                <Label>LINE Account</Label>
-                                <Input defaultValue={selectedCustomer.lineAccount} />
-                              </div>
-                              <div>
-                                <Label>Phone</Label>
-                                <Input defaultValue={selectedCustomer.phone} />
-                              </div>
-                              <div>
-                                <Label>Email</Label>
-                                <Input defaultValue={selectedCustomer.email} />
-                              </div>
-                              <Button className="w-full">Update Customer</Button>
-                            </div>
-                          )}
+                          <CustomerForm customer={customer} />
                         </DialogContent>
                       </Dialog>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomer(customer.id);
+                        }}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

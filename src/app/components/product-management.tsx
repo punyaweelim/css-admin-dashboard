@@ -22,13 +22,27 @@ import {
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+
+interface TierPricing {
+  bronze: number;
+  silver: number;
+  gold: number;
+  platinum: number;
+}
 
 interface Product {
   id: string;
   name: string;
   sku: string;
   category: string;
-  price: number;
+  tierPricing: TierPricing;
   stock: number;
   minOrder: number;
   description: string;
@@ -42,7 +56,12 @@ const mockProducts: Product[] = [
     name: "Product A",
     sku: "SKU-A001",
     category: "Electronics",
-    price: 300,
+    tierPricing: {
+      bronze: 300,
+      silver: 280,
+      gold: 260,
+      platinum: 240,
+    },
     stock: 500,
     minOrder: 50,
     description: "High-quality electronic product suitable for bulk orders",
@@ -54,7 +73,12 @@ const mockProducts: Product[] = [
     name: "Product B",
     sku: "SKU-B002",
     category: "Home & Garden",
-    price: 150,
+    tierPricing: {
+      bronze: 150,
+      silver: 140,
+      gold: 130,
+      platinum: 120,
+    },
     stock: 200,
     minOrder: 100,
     description: "Popular home and garden item with excellent reviews",
@@ -66,7 +90,12 @@ const mockProducts: Product[] = [
     name: "Product C",
     sku: "SKU-C003",
     category: "Fashion",
-    price: 400,
+    tierPricing: {
+      bronze: 400,
+      silver: 375,
+      gold: 350,
+      platinum: 325,
+    },
     stock: 50,
     minOrder: 25,
     description: "Trendy fashion product perfect for resellers",
@@ -78,7 +107,12 @@ const mockProducts: Product[] = [
     name: "Product D",
     sku: "SKU-D004",
     category: "Beauty",
-    price: 250,
+    tierPricing: {
+      bronze: 250,
+      silver: 235,
+      gold: 220,
+      platinum: 205,
+    },
     stock: 0,
     minOrder: 50,
     description: "Premium beauty product - currently restocking",
@@ -90,7 +124,12 @@ const mockProducts: Product[] = [
     name: "Product E",
     sku: "SKU-E005",
     category: "Electronics",
-    price: 500,
+    tierPricing: {
+      bronze: 500,
+      silver: 470,
+      gold: 440,
+      platinum: 410,
+    },
     stock: 1000,
     minOrder: 30,
     description: "Best-selling electronic gadget with warranty",
@@ -100,177 +139,276 @@ const mockProducts: Product[] = [
 ];
 
 export function ProductManagement() {
-  const [products] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>(mockProducts);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
+  const filteredProducts = products.filter(
+    (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+      product.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "available":
-        return "bg-black text-white";
-      case "low stock":
-        return "bg-gray-400 text-white";
-      case "out of stock":
-        return "bg-white text-black border border-black";
-      default:
-        return "bg-gray-200 text-black";
-    }
+  const handleAddProduct = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newProduct: Product = {
+      id: `PROD-${String(products.length + 1).padStart(3, "0")}`,
+      name: formData.get("name") as string,
+      sku: formData.get("sku") as string,
+      category: formData.get("category") as string,
+      tierPricing: {
+        bronze: Number(formData.get("priceBronze")),
+        silver: Number(formData.get("priceSilver")),
+        gold: Number(formData.get("priceGold")),
+        platinum: Number(formData.get("pricePlatinum")),
+      },
+      stock: Number(formData.get("stock")),
+      minOrder: Number(formData.get("minOrder")),
+      description: formData.get("description") as string,
+      imageUrl: formData.get("imageUrl") as string,
+      status: "available",
+    };
+    setProducts([...products, newProduct]);
+    setIsAddDialogOpen(false);
   };
 
-  const stats = {
-    total: products.length,
-    available: products.filter((p) => p.status === "available").length,
-    lowStock: products.filter((p) => p.status === "low stock").length,
-    outOfStock: products.filter((p) => p.status === "out of stock").length,
+  const handleEditProduct = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    const formData = new FormData(e.currentTarget);
+    const updatedProduct: Product = {
+      ...editingProduct,
+      name: formData.get("name") as string,
+      sku: formData.get("sku") as string,
+      category: formData.get("category") as string,
+      tierPricing: {
+        bronze: Number(formData.get("priceBronze")),
+        silver: Number(formData.get("priceSilver")),
+        gold: Number(formData.get("priceGold")),
+        platinum: Number(formData.get("pricePlatinum")),
+      },
+      stock: Number(formData.get("stock")),
+      minOrder: Number(formData.get("minOrder")),
+      description: formData.get("description") as string,
+      imageUrl: formData.get("imageUrl") as string,
+    };
+    setProducts(
+      products.map((p) => (p.id === editingProduct.id ? updatedProduct : p))
+    );
+    setEditingProduct(null);
   };
+
+  const handleDeleteProduct = (id: string) => {
+    setProducts(products.filter((p) => p.id !== id));
+  };
+
+  const ProductForm = ({ product }: { product?: Product }) => (
+    <form
+      onSubmit={product ? handleEditProduct : handleAddProduct}
+      className="space-y-4"
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Product Name</Label>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={product?.name}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="sku">SKU</Label>
+          <Input id="sku" name="sku" defaultValue={product?.sku} required />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="category">Category</Label>
+        <Input
+          id="category"
+          name="category"
+          defaultValue={product?.category}
+          required
+        />
+      </div>
+      <div>
+        <Label className="mb-2 block">Tier Pricing (฿)</Label>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="priceBronze" className="text-xs text-muted-foreground">
+              🥉 Bronze
+            </Label>
+            <Input
+              id="priceBronze"
+              name="priceBronze"
+              type="number"
+              defaultValue={product?.tierPricing.bronze}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="priceSilver" className="text-xs text-muted-foreground">
+              🥈 Silver
+            </Label>
+            <Input
+              id="priceSilver"
+              name="priceSilver"
+              type="number"
+              defaultValue={product?.tierPricing.silver}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="priceGold" className="text-xs text-muted-foreground">
+              🥇 Gold
+            </Label>
+            <Input
+              id="priceGold"
+              name="priceGold"
+              type="number"
+              defaultValue={product?.tierPricing.gold}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="pricePlatinum" className="text-xs text-muted-foreground">
+              💎 Platinum
+            </Label>
+            <Input
+              id="pricePlatinum"
+              name="pricePlatinum"
+              type="number"
+              defaultValue={product?.tierPricing.platinum}
+              required
+            />
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="stock">Stock</Label>
+          <Input
+            id="stock"
+            name="stock"
+            type="number"
+            defaultValue={product?.stock}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="minOrder">Min Order Quantity</Label>
+          <Input
+            id="minOrder"
+            name="minOrder"
+            type="number"
+            defaultValue={product?.minOrder}
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          name="description"
+          defaultValue={product?.description}
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="imageUrl">Image URL</Label>
+        <Input
+          id="imageUrl"
+          name="imageUrl"
+          defaultValue={product?.imageUrl}
+          placeholder="https://example.com/image.jpg"
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setIsAddDialogOpen(false);
+            setEditingProduct(null);
+          }}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" className="bg-black text-white hover:bg-gray-800">
+          {product ? "Update" : "Add"} Product
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Products</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Available</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.available}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Low Stock</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.lowStock}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Out of Stock</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.outOfStock}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Product Table */}
+      {/* Header */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5" />
-              Product Management
-            </CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5" />
+                Product Management
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage products with tier-based pricing
+              </p>
+            </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="bg-black text-white hover:bg-gray-800">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Product</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Product Image</Label>
-                    <div className="flex items-center gap-4">
-                      <Button variant="outline" className="w-full">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Image
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Upload product image (JPG, PNG)
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Product Name</Label>
-                    <Input placeholder="Enter product name" />
-                  </div>
-                  <div>
-                    <Label>SKU</Label>
-                    <Input placeholder="SKU-XXXX" />
-                  </div>
-                  <div>
-                    <Label>Category</Label>
-                    <Input placeholder="Product category" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Price (฿)</Label>
-                      <Input type="number" placeholder="0.00" />
-                    </div>
-                    <div>
-                      <Label>Stock Quantity</Label>
-                      <Input type="number" placeholder="0" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Minimum Order</Label>
-                    <Input type="number" placeholder="0" />
-                  </div>
-                  <div>
-                    <Label>Description</Label>
-                    <Textarea placeholder="Product description" />
-                  </div>
-                  <Button className="w-full">Save Product</Button>
-                </div>
+                <ProductForm />
               </DialogContent>
             </Dialog>
           </div>
-          <div className="flex gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, SKU, or category..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Products Table */}
+      <Card>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Image</TableHead>
-                <TableHead>Product ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>Product Info</TableHead>
+                <TableHead>Tier Pricing (฿)</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Min Order</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
-                    <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden">
+                    <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden">
                       {product.imageUrl && (
                         <ImageWithFallback
                           src={product.imageUrl}
@@ -280,72 +418,70 @@ export function ProductManagement() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono">{product.id}</TableCell>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>฿{product.price.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="font-semibold">{product.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {product.sku}
+                      </div>
+                      <Badge variant="outline" className="mt-1">
+                        {product.category}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1 text-sm">
+                      <div>🥉 Bronze: ฿{product.tierPricing.bronze}</div>
+                      <div>🥈 Silver: ฿{product.tierPricing.silver}</div>
+                      <div>🥇 Gold: ฿{product.tierPricing.gold}</div>
+                      <div>💎 Platinum: ฿{product.tierPricing.platinum}</div>
+                    </div>
+                  </TableCell>
                   <TableCell>{product.stock}</TableCell>
                   <TableCell>{product.minOrder}</TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(product.status)} variant="secondary">
+                    <Badge
+                      variant="secondary"
+                      className={
+                        product.status === "available"
+                          ? "bg-black text-white"
+                          : product.status === "low stock"
+                          ? "bg-gray-400 text-white"
+                          : "bg-white text-black border border-black"
+                      }
+                    >
                       {product.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Dialog>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Dialog
+                        open={editingProduct?.id === product.id}
+                        onOpenChange={(open) =>
+                          !open && setEditingProduct(null)
+                        }
+                      >
                         <DialogTrigger asChild>
                           <Button
                             variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedProduct(product)}
+                            size="icon"
+                            onClick={() => setEditingProduct(product)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
-                            <DialogTitle>Edit Product: {selectedProduct?.id}</DialogTitle>
+                            <DialogTitle>Edit Product</DialogTitle>
                           </DialogHeader>
-                          {selectedProduct && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label>Product Name</Label>
-                                <Input defaultValue={selectedProduct.name} />
-                              </div>
-                              <div>
-                                <Label>SKU</Label>
-                                <Input defaultValue={selectedProduct.sku} />
-                              </div>
-                              <div>
-                                <Label>Category</Label>
-                                <Input defaultValue={selectedProduct.category} />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <Label>Price (฿)</Label>
-                                  <Input type="number" defaultValue={selectedProduct.price} />
-                                </div>
-                                <div>
-                                  <Label>Stock Quantity</Label>
-                                  <Input type="number" defaultValue={selectedProduct.stock} />
-                                </div>
-                              </div>
-                              <div>
-                                <Label>Minimum Order</Label>
-                                <Input type="number" defaultValue={selectedProduct.minOrder} />
-                              </div>
-                              <div>
-                                <Label>Description</Label>
-                                <Textarea defaultValue={selectedProduct.description} />
-                              </div>
-                              <Button className="w-full">Update Product</Button>
-                            </div>
-                          )}
+                          <ProductForm product={product} />
                         </DialogContent>
                       </Dialog>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteProduct(product.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

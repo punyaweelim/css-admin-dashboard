@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ShoppingCart, Search, Filter, Plus, Minus, Trash2, X } from "lucide-react";
+import { ShoppingCart, Search, Filter, Plus, Minus, Trash2, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -22,12 +22,21 @@ import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
 
+type CustomerTier = "bronze" | "silver" | "gold" | "platinum";
+
+interface TierPricing {
+  bronze: number;
+  silver: number;
+  gold: number;
+  platinum: number;
+}
+
 interface Product {
   id: string;
   name: string;
   sku: string;
   category: string;
-  price: number;
+  tierPricing: TierPricing;
   stock: number;
   minOrder: number;
   description: string;
@@ -45,7 +54,12 @@ const mockProducts: Product[] = [
     name: "Product A",
     sku: "SKU-A001",
     category: "Electronics",
-    price: 300,
+    tierPricing: {
+      bronze: 300,
+      silver: 280,
+      gold: 260,
+      platinum: 240,
+    },
     stock: 500,
     minOrder: 50,
     description: "High-quality electronic product suitable for bulk orders",
@@ -57,7 +71,12 @@ const mockProducts: Product[] = [
     name: "Product B",
     sku: "SKU-B002",
     category: "Home & Garden",
-    price: 150,
+    tierPricing: {
+      bronze: 150,
+      silver: 140,
+      gold: 130,
+      platinum: 120,
+    },
     stock: 200,
     minOrder: 100,
     description: "Popular home and garden item with excellent reviews",
@@ -69,7 +88,12 @@ const mockProducts: Product[] = [
     name: "Product C",
     sku: "SKU-C003",
     category: "Fashion",
-    price: 400,
+    tierPricing: {
+      bronze: 400,
+      silver: 375,
+      gold: 350,
+      platinum: 325,
+    },
     stock: 50,
     minOrder: 25,
     description: "Trendy fashion product perfect for resellers",
@@ -81,7 +105,12 @@ const mockProducts: Product[] = [
     name: "Product D",
     sku: "SKU-D004",
     category: "Beauty",
-    price: 250,
+    tierPricing: {
+      bronze: 250,
+      silver: 235,
+      gold: 220,
+      platinum: 205,
+    },
     stock: 0,
     minOrder: 50,
     description: "Premium beauty product - currently restocking",
@@ -93,7 +122,12 @@ const mockProducts: Product[] = [
     name: "Product E",
     sku: "SKU-E005",
     category: "Electronics",
-    price: 500,
+    tierPricing: {
+      bronze: 500,
+      silver: 470,
+      gold: 440,
+      platinum: 410,
+    },
     stock: 1000,
     minOrder: 30,
     description: "Best-selling electronic gadget with warranty",
@@ -102,12 +136,20 @@ const mockProducts: Product[] = [
   },
 ];
 
+const tierInfo: Record<CustomerTier, { emoji: string; name: string; discount: string }> = {
+  bronze: { emoji: "🥉", name: "Bronze", discount: "Standard Price" },
+  silver: { emoji: "🥈", name: "Silver", discount: "5-7% Off" },
+  gold: { emoji: "🥇", name: "Gold", discount: "10-13% Off" },
+  platinum: { emoji: "💎", name: "Platinum", discount: "15-20% Off" },
+};
+
 export function ProductCatalog() {
   const [products] = useState<Product[]>(mockProducts);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [customerTier, setCustomerTier] = useState<CustomerTier>("bronze");
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
@@ -119,6 +161,10 @@ export function ProductCatalog() {
   });
 
   const categories = Array.from(new Set(products.map((p) => p.category)));
+
+  const getPrice = (product: Product) => {
+    return product.tierPricing[customerTier];
+  };
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find((item) => item.id === product.id);
@@ -150,7 +196,7 @@ export function ProductCatalog() {
     setCart(cart.filter((item) => item.id !== productId));
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + getPrice(item) * item.quantity, 0);
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -163,110 +209,167 @@ export function ProductCatalog() {
               <h1 className="text-xl font-semibold">Product Catalog</h1>
               <p className="text-sm text-gray-400">Browse and order bulk products</p>
             </div>
-            <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="relative bg-white text-black hover:bg-gray-100">
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Cart
-                  {cart.length > 0 && (
-                    <Badge className="ml-2 bg-black text-white">{cart.length}</Badge>
-                  )}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Shopping Cart ({cartItemsCount} items)</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {cart.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
-                      Your cart is empty
-                    </p>
-                  ) : (
-                    <>
-                      {cart.map((item) => (
-                        <div key={item.id} className="flex gap-4 border-b border-border pb-4">
-                          <div className="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                            {item.imageUrl && (
-                              <ImageWithFallback
-                                src={item.imageUrl}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            )}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-lg">
+                <User className="h-4 w-4" />
+                <Select value={customerTier} onValueChange={(value) => setCustomerTier(value as CustomerTier)}>
+                  <SelectTrigger className="border-0 bg-transparent text-white h-auto p-0 gap-2 focus:ring-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(tierInfo).map(([tier, info]) => (
+                      <SelectItem key={tier} value={tier}>
+                        <div className="flex items-center gap-2">
+                          <span>{info.emoji}</span>
+                          <div>
+                            <div className="font-semibold">{info.name}</div>
+                            <div className="text-xs text-muted-foreground">{info.discount}</div>
                           </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold">{item.name}</h4>
-                            <p className="text-sm text-muted-foreground">{item.sku}</p>
-                            <p className="text-sm font-semibold mt-1">
-                              ฿{item.price.toLocaleString()} each
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="relative bg-white text-black hover:bg-gray-100">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Cart
+                    {cart.length > 0 && (
+                      <Badge className="ml-2 bg-black text-white">{cart.length}</Badge>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Shopping Cart ({cartItemsCount} items)</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {cart.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        Your cart is empty
+                      </p>
+                    ) : (
+                      <>
+                        <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">{tierInfo[customerTier].emoji}</span>
+                            <div>
+                              <div className="font-semibold">{tierInfo[customerTier].name} Member</div>
+                              <div className="text-sm text-muted-foreground">{tierInfo[customerTier].discount}</div>
+                            </div>
+                          </div>
+                        </div>
+                        {cart.map((item) => (
+                          <div key={item.id} className="flex gap-4 border-b border-border pb-4">
+                            <div className="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                              {item.imageUrl && (
+                                <ImageWithFallback
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold">{item.name}</h4>
+                              <p className="text-sm text-muted-foreground">{item.sku}</p>
+                              <p className="text-sm font-semibold mt-1">
+                                ฿{getPrice(item).toLocaleString()} each
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity - item.minOrder)}
+                                  disabled={item.quantity <= item.minOrder}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="text-sm min-w-[60px] text-center">
+                                  {item.quantity} units
+                                </span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => updateQuantity(item.id, item.quantity + item.minOrder)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold">
+                                ฿{(getPrice(item) * item.quantity).toLocaleString()}
+                              </p>
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity - item.minOrder)}
-                                disabled={item.quantity <= item.minOrder}
+                                onClick={() => removeFromCart(item.id)}
+                                className="mt-2"
                               >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="text-sm min-w-[60px] text-center">
-                                {item.quantity} units
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateQuantity(item.id, item.quantity + item.minOrder)}
-                              >
-                                <Plus className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-semibold">
-                              ฿{(item.price * item.quantity).toLocaleString()}
-                            </p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFromCart(item.id)}
-                              className="mt-2"
-                            >
-                              <Trash2 className="h-4 w-4" />
+                        ))}
+                        <div className="border-t border-border pt-4">
+                          <div className="flex justify-between text-lg font-semibold mb-4">
+                            <span>Total:</span>
+                            <span>฿{cartTotal.toLocaleString()}</span>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label>LINE ID</Label>
+                              <Input placeholder="Enter your LINE ID" />
+                            </div>
+                            <div>
+                              <Label>Notes (Optional)</Label>
+                              <Textarea placeholder="Any special instructions?" />
+                            </div>
+                            <Button className="w-full bg-black text-white hover:bg-gray-800">
+                              Submit Order
                             </Button>
                           </div>
                         </div>
-                      ))}
-                      <div className="border-t border-border pt-4">
-                        <div className="flex justify-between text-lg font-semibold mb-4">
-                          <span>Total:</span>
-                          <span>฿{cartTotal.toLocaleString()}</span>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <Label>LINE ID</Label>
-                            <Input placeholder="Enter your LINE ID" />
-                          </div>
-                          <div>
-                            <Label>Notes (Optional)</Label>
-                            <Textarea placeholder="Any special instructions?" />
-                          </div>
-                          <Button className="w-full bg-black text-white hover:bg-gray-800">
-                            Submit Order
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+                      </>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Tier Info Banner */}
+        <Card className="mb-6 bg-gradient-to-r from-gray-50 to-white">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-4xl">{tierInfo[customerTier].emoji}</span>
+                <div>
+                  <h3 className="font-semibold text-lg">{tierInfo[customerTier].name} Membership</h3>
+                  <p className="text-sm text-muted-foreground">
+                    You're getting {tierInfo[customerTier].discount} on all products!
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => {
+                const tiers: CustomerTier[] = ["bronze", "silver", "gold", "platinum"];
+                const currentIndex = tiers.indexOf(customerTier);
+                const nextIndex = (currentIndex + 1) % tiers.length;
+                setCustomerTier(tiers[nextIndex]);
+              }}>
+                Switch Tier
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Filters */}
         <Card className="mb-6">
           <CardHeader>
@@ -343,10 +446,15 @@ export function ProductCatalog() {
                 </p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold">
-                    ฿{product.price.toLocaleString()}
+                    ฿{getPrice(product).toLocaleString()}
                   </span>
                   <span className="text-xs text-muted-foreground">per unit</span>
                 </div>
+                {customerTier !== "bronze" && (
+                  <div className="text-xs text-green-600 font-semibold">
+                    Save ฿{(product.tierPricing.bronze - getPrice(product)).toLocaleString()} per unit!
+                  </div>
+                )}
                 <div className="text-sm text-muted-foreground">
                   <p>Min. Order: {product.minOrder} units</p>
                   <p>Stock: {product.stock} units</p>
