@@ -181,6 +181,7 @@ export function ProductCatalog() {
     }
   };
 
+
   const updateQuantity = (productId: string, newQuantity: number) => {
     const product = products.find((p) => p.id === productId);
     if (product && newQuantity >= product.minOrder) {
