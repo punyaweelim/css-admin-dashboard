@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ShoppingCart, Search, Filter, Plus, Minus, Trash2, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ShoppingCart, Search, Filter, Plus, Minus, Trash2, User, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -42,11 +43,85 @@ interface Product {
   description: string;
   imageUrl?: string;
   status: "available" | "low stock" | "out of stock";
+  storeId: string; // เพิ่ม storeId เพื่อแยกสินค้าตามร้าน
 }
 
 interface CartItem extends Product {
   quantity: number;
 }
+
+interface StoreAccess {
+  storeId: string;
+  storeName: string;
+  tier: CustomerTier;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  lineId: string;
+  storeAccess: StoreAccess[];
+  phone: string;
+  email: string;
+  status: "active" | "inactive";
+}
+
+const tierInfo: Record<CustomerTier, { emoji: string; name: string; discount: string }> = {
+  bronze: { emoji: "🥉", name: "Bronze", discount: "Standard Price" },
+  silver: { emoji: "🥈", name: "Silver", discount: "5-7% Off" },
+  gold: { emoji: "🥇", name: "Gold", discount: "10-13% Off" },
+  platinum: { emoji: "💎", name: "Platinum", discount: "15-20% Off" },
+};
+
+// Mock customers data - ใน production จะดึงจาก API
+const mockCustomers: Customer[] = [
+  {
+    id: "CUST-001",
+    name: "สมชาย ใจดี",
+    lineId: "LINE-123456",
+    storeAccess: [
+      { storeId: "store1", storeName: "Store Account 1", tier: "gold" },
+    ],
+    phone: "081-234-5678",
+    email: "somchai@example.com",
+    status: "active",
+  },
+  {
+    id: "CUST-002",
+    name: "สมหญิง รักสวย",
+    lineId: "LINE-789012",
+    storeAccess: [
+      { storeId: "store2", storeName: "Store Account 2", tier: "platinum" },
+      { storeId: "store3", storeName: "Store Account 3", tier: "silver" },
+    ],
+    phone: "082-345-6789",
+    email: "somying@example.com",
+    status: "active",
+  },
+  {
+    id: "CUST-003",
+    name: "วิชัย ประเสริฐ",
+    lineId: "LINE-345678",
+    storeAccess: [
+      { storeId: "store3", storeName: "Store Account 3", tier: "silver" },
+    ],
+    phone: "083-456-7890",
+    email: "wichai@example.com",
+    status: "active",
+  },
+  {
+    id: "CUST-004",
+    name: "อรุณี สวัสดี",
+    lineId: "LINE-901234",
+    storeAccess: [
+      { storeId: "store1", storeName: "Store Account 1", tier: "bronze" },
+      { storeId: "store2", storeName: "Store Account 2", tier: "gold" },
+    ],
+    phone: "084-567-8901",
+    email: "arunee@example.com",
+    status: "active",
+  },
+];
 
 const mockProducts: Product[] = [
   {
@@ -65,6 +140,7 @@ const mockProducts: Product[] = [
     description: "High-quality electronic product suitable for bulk orders",
     imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
     status: "available",
+    storeId: "store1",
   },
   {
     id: "PROD-002",
@@ -82,6 +158,7 @@ const mockProducts: Product[] = [
     description: "Popular home and garden item with excellent reviews",
     imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
     status: "available",
+    storeId: "store1",
   },
   {
     id: "PROD-003",
@@ -99,6 +176,7 @@ const mockProducts: Product[] = [
     description: "Trendy fashion product perfect for resellers",
     imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
     status: "low stock",
+    storeId: "store2",
   },
   {
     id: "PROD-004",
@@ -116,6 +194,7 @@ const mockProducts: Product[] = [
     description: "Premium beauty product - currently restocking",
     imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
     status: "out of stock",
+    storeId: "store2",
   },
   {
     id: "PROD-005",
@@ -133,23 +212,64 @@ const mockProducts: Product[] = [
     description: "Best-selling electronic gadget with warranty",
     imageUrl: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400",
     status: "available",
+    storeId: "store2",
+  },
+  {
+    id: "PROD-006",
+    name: "Product F",
+    sku: "SKU-F006",
+    category: "Sports",
+    tierPricing: {
+      bronze: 350,
+      silver: 330,
+      gold: 310,
+      platinum: 290,
+    },
+    stock: 300,
+    minOrder: 40,
+    description: "High-performance sports equipment",
+    imageUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400",
+    status: "available",
+    storeId: "store3",
   },
 ];
 
-const tierInfo: Record<CustomerTier, { emoji: string; name: string; discount: string }> = {
-  bronze: { emoji: "🥉", name: "Bronze", discount: "Standard Price" },
-  silver: { emoji: "🥈", name: "Silver", discount: "5-7% Off" },
-  gold: { emoji: "🥇", name: "Gold", discount: "10-13% Off" },
-  platinum: { emoji: "💎", name: "Platinum", discount: "15-20% Off" },
-};
-
 export function ProductCatalog() {
-  const [products] = useState<Product[]>(mockProducts);
+  const { customerId } = useParams<{ customerId: string }>();
+  const navigate = useNavigate();
+  
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [selectedStore, setSelectedStore] = useState<StoreAccess | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [customerTier, setCustomerTier] = useState<CustomerTier>("bronze");
+
+  // Load customer data based on customerId
+  useEffect(() => {
+    if (customerId) {
+      const foundCustomer = mockCustomers.find(c => c.id === customerId);
+      if (foundCustomer && foundCustomer.status === "active") {
+        setCustomer(foundCustomer);
+        // Set first store as default
+        if (foundCustomer.storeAccess.length > 0) {
+          setSelectedStore(foundCustomer.storeAccess[0]);
+        }
+      } else {
+        // Customer not found or inactive
+        navigate("/");
+      }
+    }
+  }, [customerId, navigate]);
+
+  // Filter products by selected store
+  useEffect(() => {
+    if (selectedStore) {
+      const storeProducts = mockProducts.filter(p => p.storeId === selectedStore.storeId);
+      setProducts(storeProducts);
+    }
+  }, [selectedStore]);
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
@@ -163,7 +283,8 @@ export function ProductCatalog() {
   const categories = Array.from(new Set(products.map((p) => p.category)));
 
   const getPrice = (product: Product) => {
-    return product.tierPricing[customerTier];
+    if (!selectedStore) return product.tierPricing.bronze;
+    return product.tierPricing[selectedStore.tier];
   };
 
   const addToCart = (product: Product) => {
@@ -199,38 +320,86 @@ export function ProductCatalog() {
   const cartTotal = cart.reduce((sum, item) => sum + getPrice(item) * item.quantity, 0);
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  if (!customer || !selectedStore) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Loading...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Please wait while we load your information.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-black text-white sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold">Product Catalog</h1>
-              <p className="text-sm text-gray-400">Browse and order bulk products</p>
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-white hover:bg-white/10"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Admin
+              </Button>
+              <div className="border-l border-white/20 pl-4">
+                <h1 className="text-xl font-semibold">Product Catalog</h1>
+                <p className="text-sm text-gray-400">Browse and order bulk products</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Customer Info */}
               <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-lg">
                 <User className="h-4 w-4" />
-                <Select value={customerTier} onValueChange={(value) => setCustomerTier(value as CustomerTier)}>
-                  <SelectTrigger className="border-0 bg-transparent text-white h-auto p-0 gap-2 focus:ring-0">
+                <div className="text-sm">
+                  <div className="font-semibold">{customer.name}</div>
+                  <div className="text-xs text-gray-400">{customer.lineId}</div>
+                </div>
+              </div>
+
+              {/* Store Selector */}
+              {customer.storeAccess.length > 1 && (
+                <Select
+                  value={selectedStore.storeId}
+                  onValueChange={(storeId) => {
+                    const store = customer.storeAccess.find(s => s.storeId === storeId);
+                    if (store) {
+                      setSelectedStore(store);
+                      setCart([]); // Clear cart when changing store
+                    }
+                  }}
+                >
+                  <SelectTrigger className="border-0 bg-white/10 text-white h-auto p-2 gap-2 focus:ring-0 min-w-[200px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(tierInfo).map(([tier, info]) => (
-                      <SelectItem key={tier} value={tier}>
+                    {customer.storeAccess.map((store) => (
+                      <SelectItem key={store.storeId} value={store.storeId}>
                         <div className="flex items-center gap-2">
-                          <span>{info.emoji}</span>
+                          <span>{tierInfo[store.tier].emoji}</span>
                           <div>
-                            <div className="font-semibold">{info.name}</div>
-                            <div className="text-xs text-muted-foreground">{info.discount}</div>
+                            <div className="font-semibold">{store.storeName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {tierInfo[store.tier].name} - {tierInfo[store.tier].discount}
+                            </div>
                           </div>
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              )}
+
+              {/* Cart Button */}
               <Dialog open={isCartOpen} onOpenChange={setIsCartOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="relative bg-white text-black hover:bg-gray-100">
@@ -241,7 +410,7 @@ export function ProductCatalog() {
                     )}
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Shopping Cart ({cartItemsCount} items)</DialogTitle>
                   </DialogHeader>
@@ -254,10 +423,12 @@ export function ProductCatalog() {
                       <>
                         <div className="bg-gray-50 p-3 rounded-lg flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-2xl">{tierInfo[customerTier].emoji}</span>
+                            <span className="text-2xl">{tierInfo[selectedStore.tier].emoji}</span>
                             <div>
-                              <div className="font-semibold">{tierInfo[customerTier].name} Member</div>
-                              <div className="text-sm text-muted-foreground">{tierInfo[customerTier].discount}</div>
+                              <div className="font-semibold">{selectedStore.storeName}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {tierInfo[selectedStore.tier].name} Member - {tierInfo[selectedStore.tier].discount}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -322,7 +493,7 @@ export function ProductCatalog() {
                           <div className="space-y-3">
                             <div>
                               <Label>LINE ID</Label>
-                              <Input placeholder="Enter your LINE ID" />
+                              <Input value={customer.lineId} disabled />
                             </div>
                             <div>
                               <Label>Notes (Optional)</Label>
@@ -350,22 +521,16 @@ export function ProductCatalog() {
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-4xl">{tierInfo[customerTier].emoji}</span>
+                <span className="text-4xl">{tierInfo[selectedStore.tier].emoji}</span>
                 <div>
-                  <h3 className="font-semibold text-lg">{tierInfo[customerTier].name} Membership</h3>
+                  <h3 className="font-semibold text-lg">
+                    {selectedStore.storeName} - {tierInfo[selectedStore.tier].name} Membership
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    You're getting {tierInfo[customerTier].discount} on all products!
+                    You're getting {tierInfo[selectedStore.tier].discount} on all products in this store!
                   </p>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => {
-                const tiers: CustomerTier[] = ["bronze", "silver", "gold", "platinum"];
-                const currentIndex = tiers.indexOf(customerTier);
-                const nextIndex = (currentIndex + 1) % tiers.length;
-                setCustomerTier(tiers[nextIndex]);
-              }}>
-                Switch Tier
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -450,7 +615,7 @@ export function ProductCatalog() {
                   </span>
                   <span className="text-xs text-muted-foreground">per unit</span>
                 </div>
-                {customerTier !== "bronze" && (
+                {selectedStore.tier !== "bronze" && (
                   <div className="text-xs text-green-600 font-semibold">
                     Save ฿{(product.tierPricing.bronze - getPrice(product)).toLocaleString()} per unit!
                   </div>
@@ -474,7 +639,7 @@ export function ProductCatalog() {
 
         {filteredProducts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No products found</p>
+            <p className="text-muted-foreground">No products found in this store</p>
           </div>
         )}
       </main>

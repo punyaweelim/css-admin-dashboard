@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Users, Search, UserPlus, Edit, Trash2, ArrowLeft, ShoppingCart, TrendingUp, Award } from "lucide-react";
+import { Users, Search, UserPlus, Edit, Trash2, ArrowLeft, ShoppingCart, TrendingUp, Award, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -27,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/app/components/ui/select";
+import { Checkbox } from "@/app/components/ui/checkbox";
 
 type CustomerTier = "bronze" | "silver" | "gold" | "platinum";
 
@@ -39,14 +41,19 @@ interface Order {
   status: string;
 }
 
+interface StoreAccess {
+  storeId: string;
+  storeName: string;
+  tier: CustomerTier;
+}
+
 interface Customer {
   id: string;
   name: string;
   lineId: string;
-  lineAccount: string;
+  storeAccess: StoreAccess[]; // Changed from single lineAccount to multiple stores
   phone: string;
   email: string;
-  tier: CustomerTier;
   totalOrders: number;
   totalSpent: number;
   registeredDate: string;
@@ -62,15 +69,22 @@ const tierInfo: Record<CustomerTier, { emoji: string; name: string; color: strin
   platinum: { emoji: "💎", name: "Platinum", color: "text-purple-700", bg: "bg-purple-100" },
 };
 
+const availableStores = [
+  { id: "store1", name: "Store Account 1" },
+  { id: "store2", name: "Store Account 2" },
+  { id: "store3", name: "Store Account 3" },
+];
+
 const mockCustomers: Customer[] = [
   {
     id: "CUST-001",
     name: "สมชาย ใจดี",
     lineId: "LINE-123456",
-    lineAccount: "Store Account 1",
+    storeAccess: [
+      { storeId: "store1", storeName: "Store Account 1", tier: "gold" },
+    ],
     phone: "081-234-5678",
     email: "somchai@example.com",
-    tier: "gold",
     totalOrders: 5,
     totalSpent: 125000,
     registeredDate: "2025-11-15",
@@ -115,10 +129,12 @@ const mockCustomers: Customer[] = [
     id: "CUST-002",
     name: "สมหญิง รักสวย",
     lineId: "LINE-789012",
-    lineAccount: "Store Account 2",
+    storeAccess: [
+      { storeId: "store2", storeName: "Store Account 2", tier: "platinum" },
+      { storeId: "store3", storeName: "Store Account 3", tier: "silver" },
+    ],
     phone: "082-345-6789",
     email: "somying@example.com",
-    tier: "platinum",
     totalOrders: 8,
     totalSpent: 240000,
     registeredDate: "2025-10-20",
@@ -163,10 +179,11 @@ const mockCustomers: Customer[] = [
     id: "CUST-003",
     name: "วิชัย ประเสริฐ",
     lineId: "LINE-345678",
-    lineAccount: "Store Account 3",
+    storeAccess: [
+      { storeId: "store3", storeName: "Store Account 3", tier: "silver" },
+    ],
     phone: "083-456-7890",
     email: "wichai@example.com",
-    tier: "silver",
     totalOrders: 3,
     totalSpent: 85000,
     registeredDate: "2025-12-01",
@@ -193,10 +210,12 @@ const mockCustomers: Customer[] = [
     id: "CUST-004",
     name: "อรุณี สวัสดี",
     lineId: "LINE-901234",
-    lineAccount: "Store Account 1",
+    storeAccess: [
+      { storeId: "store1", storeName: "Store Account 1", tier: "bronze" },
+      { storeId: "store2", storeName: "Store Account 2", tier: "gold" },
+    ],
     phone: "084-567-8901",
     email: "arunee@example.com",
-    tier: "bronze",
     totalOrders: 1,
     totalSpent: 25000,
     registeredDate: "2026-01-10",
@@ -222,11 +241,15 @@ const mockCustomers: Customer[] = [
 ];
 
 export function CustomerManagement() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  // Store access state for form
+  const [formStoreAccess, setFormStoreAccess] = useState<StoreAccess[]>([]);
 
   const filteredCustomers = customers.filter(
     (customer) =>
@@ -242,10 +265,9 @@ export function CustomerManagement() {
       id: `CUST-${String(customers.length + 1).padStart(3, "0")}`,
       name: formData.get("name") as string,
       lineId: formData.get("lineId") as string,
-      lineAccount: formData.get("lineAccount") as string,
+      storeAccess: formStoreAccess,
       phone: formData.get("phone") as string,
       email: formData.get("email") as string,
-      tier: formData.get("tier") as CustomerTier,
       totalOrders: 0,
       totalSpent: 0,
       registeredDate: new Date().toISOString().split("T")[0],
@@ -253,6 +275,7 @@ export function CustomerManagement() {
     };
     setCustomers([...customers, newCustomer]);
     setIsAddDialogOpen(false);
+    setFormStoreAccess([]);
   };
 
   const handleEditCustomer = (e: React.FormEvent<HTMLFormElement>) => {
@@ -263,133 +286,177 @@ export function CustomerManagement() {
       ...editingCustomer,
       name: formData.get("name") as string,
       lineId: formData.get("lineId") as string,
-      lineAccount: formData.get("lineAccount") as string,
+      storeAccess: formStoreAccess,
       phone: formData.get("phone") as string,
       email: formData.get("email") as string,
-      tier: formData.get("tier") as CustomerTier,
       status: formData.get("status") as "active" | "inactive",
     };
     setCustomers(
       customers.map((c) => (c.id === editingCustomer.id ? updatedCustomer : c))
     );
     setEditingCustomer(null);
+    setFormStoreAccess([]);
   };
 
   const handleDeleteCustomer = (id: string) => {
     setCustomers(customers.filter((c) => c.id !== id));
   };
 
-  const CustomerForm = ({ customer }: { customer?: Customer }) => (
-    <form
-      onSubmit={customer ? handleEditCustomer : handleAddCustomer}
-      className="space-y-4"
-    >
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            name="name"
-            defaultValue={customer?.name}
-            required
-          />
+  const toggleStoreAccess = (storeId: string, storeName: string) => {
+    const existingIndex = formStoreAccess.findIndex((s) => s.storeId === storeId);
+    if (existingIndex >= 0) {
+      setFormStoreAccess(formStoreAccess.filter((s) => s.storeId !== storeId));
+    } else {
+      setFormStoreAccess([...formStoreAccess, { storeId, storeName, tier: "bronze" }]);
+    }
+  };
+
+  const updateStoreTier = (storeId: string, tier: CustomerTier) => {
+    setFormStoreAccess(
+      formStoreAccess.map((s) => (s.storeId === storeId ? { ...s, tier } : s))
+    );
+  };
+
+  const CustomerForm = ({ customer }: { customer?: Customer }) => {
+    // Initialize form state when dialog opens
+    useState(() => {
+      if (customer) {
+        setFormStoreAccess(customer.storeAccess);
+      } else {
+        setFormStoreAccess([]);
+      }
+    });
+
+    return (
+      <form
+        onSubmit={customer ? handleEditCustomer : handleAddCustomer}
+        className="space-y-4"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              name="name"
+              defaultValue={customer?.name}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="lineId">LINE ID</Label>
+            <Input
+              id="lineId"
+              name="lineId"
+              defaultValue={customer?.lineId}
+              required
+            />
+          </div>
         </div>
+
         <div>
-          <Label htmlFor="lineId">LINE ID</Label>
-          <Input
-            id="lineId"
-            name="lineId"
-            defaultValue={customer?.lineId}
-            required
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="lineAccount">LINE@ Account</Label>
-        <Select
-          name="lineAccount"
-          defaultValue={customer?.lineAccount || "Store Account 1"}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Store Account 1">Store Account 1</SelectItem>
-            <SelectItem value="Store Account 2">Store Account 2</SelectItem>
-            <SelectItem value="Store Account 3">Store Account 3</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="phone">Phone</Label>
-          <Input
-            id="phone"
-            name="phone"
-            defaultValue={customer?.phone}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            defaultValue={customer?.email}
-            required
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="tier">Membership Tier</Label>
-        <Select name="tier" defaultValue={customer?.tier || "bronze"}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select tier" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(tierInfo).map(([tier, info]) => (
-              <SelectItem key={tier} value={tier}>
-                <div className="flex items-center gap-2">
-                  <span>{info.emoji}</span>
-                  <span>{info.name}</span>
+          <Label className="mb-2 block">Store Access & Membership Tier</Label>
+          <div className="space-y-3 border border-border rounded-lg p-4">
+            {availableStores.map((store) => {
+              const isSelected = formStoreAccess.some((s) => s.storeId === store.id);
+              const storeData = formStoreAccess.find((s) => s.storeId === store.id);
+              
+              return (
+                <div key={store.id} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={store.id}
+                      checked={isSelected}
+                      onCheckedChange={() => toggleStoreAccess(store.id, store.name)}
+                    />
+                    <Label htmlFor={store.id} className="cursor-pointer flex-1">
+                      {store.name}
+                    </Label>
+                  </div>
+                  
+                  {isSelected && (
+                    <div className="ml-6">
+                      <Select
+                        value={storeData?.tier || "bronze"}
+                        onValueChange={(value) => updateStoreTier(store.id, value as CustomerTier)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select tier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(tierInfo).map(([tier, info]) => (
+                            <SelectItem key={tier} value={tier}>
+                              <div className="flex items-center gap-2">
+                                <span>{info.emoji}</span>
+                                <span>{info.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {customer && (
-        <div>
-          <Label htmlFor="status">Status</Label>
-          <Select name="status" defaultValue={customer.status}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+              );
+            })}
+          </div>
         </div>
-      )}
-      <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            setIsAddDialogOpen(false);
-            setEditingCustomer(null);
-          }}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" className="bg-black text-white hover:bg-gray-800">
-          {customer ? "Update" : "Add"} Customer
-        </Button>
-      </div>
-    </form>
-  );
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              name="phone"
+              defaultValue={customer?.phone}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={customer?.email}
+              required
+            />
+          </div>
+        </div>
+
+        {customer && (
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select name="status" defaultValue={customer.status}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setIsAddDialogOpen(false);
+              setEditingCustomer(null);
+              setFormStoreAccess([]);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-black text-white hover:bg-gray-800">
+            {customer ? "Update" : "Add"} Customer
+          </Button>
+        </div>
+      </form>
+    );
+  };
 
   if (selectedCustomer) {
     return (
@@ -416,23 +483,27 @@ export function CustomerManagement() {
                 <Label className="text-muted-foreground">Name</Label>
                 <p className="font-semibold">{selectedCustomer.name}</p>
               </div>
+              
               <div>
-                <Label className="text-muted-foreground">Membership Tier</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge className={`${tierInfo[selectedCustomer.tier].bg} ${tierInfo[selectedCustomer.tier].color} border-0`}>
-                    <span className="mr-1">{tierInfo[selectedCustomer.tier].emoji}</span>
-                    {tierInfo[selectedCustomer.tier].name}
-                  </Badge>
+                <Label className="text-muted-foreground">Store Access & Tiers</Label>
+                <div className="space-y-2 mt-2">
+                  {selectedCustomer.storeAccess.map((store, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span className="text-sm">{store.storeName}</span>
+                      <Badge className={`${tierInfo[store.tier].bg} ${tierInfo[store.tier].color} border-0`}>
+                        <span className="mr-1">{tierInfo[store.tier].emoji}</span>
+                        {tierInfo[store.tier].name}
+                      </Badge>
+                    </div>
+                  ))}
                 </div>
               </div>
+
               <div>
                 <Label className="text-muted-foreground">LINE ID</Label>
                 <p className="font-semibold">{selectedCustomer.lineId}</p>
               </div>
-              <div>
-                <Label className="text-muted-foreground">LINE@ Account</Label>
-                <p className="font-semibold">{selectedCustomer.lineAccount}</p>
-              </div>
+              
               <div>
                 <Label className="text-muted-foreground">Phone</Label>
                 <p className="font-semibold">{selectedCustomer.phone}</p>
@@ -459,6 +530,17 @@ export function CustomerManagement() {
                 >
                   {selectedCustomer.status}
                 </Badge>
+              </div>
+
+              {/* Product Catalog Button */}
+              <div className="pt-4 border-t">
+                <Button 
+                  className="w-full bg-black text-white hover:bg-gray-800"
+                  onClick={() => navigate(`/product-catalog/${selectedCustomer.id}`)}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  View Product Catalog
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -568,7 +650,7 @@ export function CustomerManagement() {
                 Customer Management
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Manage customers and their membership tiers
+                Manage customers and their store access
               </p>
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -578,7 +660,7 @@ export function CustomerManagement() {
                   Add Customer
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Customer</DialogTitle>
                 </DialogHeader>
@@ -603,7 +685,9 @@ export function CustomerManagement() {
       {/* Tier Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {Object.entries(tierInfo).map(([tier, info]) => {
-          const count = customers.filter((c) => c.tier === tier).length;
+          const count = customers.reduce((sum, c) => 
+            sum + c.storeAccess.filter(s => s.tier === tier).length, 0
+          );
           return (
             <Card key={tier}>
               <CardContent className="pt-6">
@@ -630,8 +714,8 @@ export function CustomerManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer Info</TableHead>
-                <TableHead>Tier</TableHead>
-                <TableHead>LINE Info</TableHead>
+                <TableHead>Store Access</TableHead>
+                <TableHead>LINE ID</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Orders</TableHead>
                 <TableHead>Total Spent</TableHead>
@@ -655,18 +739,17 @@ export function CustomerManagement() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`${tierInfo[customer.tier].bg} ${tierInfo[customer.tier].color} border-0`}>
-                      <span className="mr-1">{tierInfo[customer.tier].emoji}</span>
-                      {tierInfo[customer.tier].name}
-                    </Badge>
+                    <div className="space-y-1">
+                      {customer.storeAccess.map((store, index) => (
+                        <Badge key={index} className={`${tierInfo[store.tier].bg} ${tierInfo[store.tier].color} border-0 mr-1`}>
+                          <span className="mr-1">{tierInfo[store.tier].emoji}</span>
+                          {store.storeName.replace('Store Account ', 'S')}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <div>
-                      <div className="text-sm font-semibold">{customer.lineId}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {customer.lineAccount}
-                      </div>
-                    </div>
+                    <div className="text-sm font-semibold">{customer.lineId}</div>
                   </TableCell>
                   <TableCell>
                     <div>
@@ -692,9 +775,25 @@ export function CustomerManagement() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/product-catalog/${customer.id}`);
+                        }}
+                        title="View Product Catalog"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
                       <Dialog
                         open={editingCustomer?.id === customer.id}
-                        onOpenChange={(open) => !open && setEditingCustomer(null)}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setEditingCustomer(null);
+                            setFormStoreAccess([]);
+                          }
+                        }}
                       >
                         <DialogTrigger asChild>
                           <Button
@@ -703,12 +802,13 @@ export function CustomerManagement() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingCustomer(customer);
+                              setFormStoreAccess(customer.storeAccess);
                             }}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>Edit Customer</DialogTitle>
                           </DialogHeader>
