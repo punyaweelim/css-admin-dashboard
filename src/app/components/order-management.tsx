@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Search, Filter, Eye, Edit, Trash2, Plus, X } from "lucide-react";
+import { Package, Search, Filter, Eye, Edit, Trash2, Plus, X, Calendar, User, Store, Hash, CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Tag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -28,6 +28,19 @@ import {
 } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
+import { Separator } from "@/app/components/ui/separator";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+
+interface OrderItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  imageUrl: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
 
 interface Order {
   id: string;
@@ -35,10 +48,12 @@ interface Order {
   lineId: string;
   lineAccount: string;
   products: string[];
+  items: OrderItem[];
   quantity: number;
   totalAmount: number;
   status: "pending" | "processing" | "completed" | "cancelled";
   orderDate: string;
+  notes?: string;
 }
 
 interface Customer {
@@ -75,10 +90,33 @@ const mockOrders: Order[] = [
     lineId: "LINE-123456",
     lineAccount: "Store Account 1",
     products: ["Product A", "Product B"],
+    items: [
+      {
+        productId: "PROD-001",
+        productName: "Product A - Premium Electronics",
+        sku: "SKU-A001",
+        category: "Electronics",
+        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
+        quantity: 100,
+        unitPrice: 300,
+        subtotal: 30000,
+      },
+      {
+        productId: "PROD-002",
+        productName: "Product B - Home & Garden",
+        sku: "SKU-B002",
+        category: "Home & Garden",
+        imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
+        quantity: 50,
+        unitPrice: 150,
+        subtotal: 7500,
+      },
+    ],
     quantity: 150,
-    totalAmount: 45000,
+    totalAmount: 37500,
     status: "pending",
     orderDate: "2026-01-20",
+    notes: "กรุณาจัดส่งในเวลาราชการ",
   },
   {
     id: "ORD-002",
@@ -86,6 +124,18 @@ const mockOrders: Order[] = [
     lineId: "LINE-789012",
     lineAccount: "Store Account 2",
     products: ["Product C"],
+    items: [
+      {
+        productId: "PROD-003",
+        productName: "Product C - Fashion Accessories",
+        sku: "SKU-C003",
+        category: "Fashion",
+        imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
+        quantity: 200,
+        unitPrice: 400,
+        subtotal: 80000,
+      },
+    ],
     quantity: 200,
     totalAmount: 80000,
     status: "processing",
@@ -97,8 +147,30 @@ const mockOrders: Order[] = [
     lineId: "LINE-345678",
     lineAccount: "Store Account 3",
     products: ["Product A", "Product D"],
+    items: [
+      {
+        productId: "PROD-001",
+        productName: "Product A - Premium Electronics",
+        sku: "SKU-A001",
+        category: "Electronics",
+        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
+        quantity: 50,
+        unitPrice: 300,
+        subtotal: 15000,
+      },
+      {
+        productId: "PROD-004",
+        productName: "Product D - Beauty Products",
+        sku: "SKU-D004",
+        category: "Beauty",
+        imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
+        quantity: 50,
+        unitPrice: 250,
+        subtotal: 12500,
+      },
+    ],
     quantity: 100,
-    totalAmount: 35000,
+    totalAmount: 27500,
     status: "completed",
     orderDate: "2026-01-18",
   },
@@ -108,10 +180,43 @@ const mockOrders: Order[] = [
     lineId: "LINE-901234",
     lineAccount: "Store Account 1",
     products: ["Product B", "Product C", "Product D"],
+    items: [
+      {
+        productId: "PROD-002",
+        productName: "Product B - Home & Garden",
+        sku: "SKU-B002",
+        category: "Home & Garden",
+        imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
+        quantity: 100,
+        unitPrice: 150,
+        subtotal: 15000,
+      },
+      {
+        productId: "PROD-003",
+        productName: "Product C - Fashion Accessories",
+        sku: "SKU-C003",
+        category: "Fashion",
+        imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
+        quantity: 100,
+        unitPrice: 400,
+        subtotal: 40000,
+      },
+      {
+        productId: "PROD-004",
+        productName: "Product D - Beauty Products",
+        sku: "SKU-D004",
+        category: "Beauty",
+        imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
+        quantity: 100,
+        unitPrice: 250,
+        subtotal: 25000,
+      },
+    ],
     quantity: 300,
-    totalAmount: 120000,
+    totalAmount: 80000,
     status: "processing",
     orderDate: "2026-01-17",
+    notes: "แพ็คแยกตามประเภทสินค้า",
   },
   {
     id: "ORD-005",
@@ -119,12 +224,103 @@ const mockOrders: Order[] = [
     lineId: "LINE-567890",
     lineAccount: "Store Account 2",
     products: ["Product A"],
+    items: [
+      {
+        productId: "PROD-001",
+        productName: "Product A - Premium Electronics",
+        sku: "SKU-A001",
+        category: "Electronics",
+        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
+        quantity: 50,
+        unitPrice: 300,
+        subtotal: 15000,
+      },
+    ],
     quantity: 50,
     totalAmount: 15000,
     status: "cancelled",
     orderDate: "2026-01-16",
   },
 ];
+
+const statusConfig = {
+  pending: {
+    label: "Pending",
+    color: "bg-amber-100 text-amber-800 border-amber-200",
+    icon: Clock,
+    step: 1,
+  },
+  processing: {
+    label: "Processing",
+    color: "bg-blue-100 text-blue-800 border-blue-200",
+    icon: Loader2,
+    step: 2,
+  },
+  completed: {
+    label: "Completed",
+    color: "bg-green-100 text-green-800 border-green-200",
+    icon: CheckCircle2,
+    step: 3,
+  },
+  cancelled: {
+    label: "Cancelled",
+    color: "bg-red-100 text-red-800 border-red-200",
+    icon: XCircle,
+    step: -1,
+  },
+};
+
+function OrderStatusTimeline({ status }: { status: Order["status"] }) {
+  if (status === "cancelled") {
+    return (
+      <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
+        <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+        <span className="text-sm font-medium text-red-700">คำสั่งซื้อถูกยกเลิก</span>
+      </div>
+    );
+  }
+
+  const steps = [
+    { key: "pending", label: "รอดำเนินการ", icon: Clock },
+    { key: "processing", label: "กำลังดำเนินการ", icon: Loader2 },
+    { key: "completed", label: "เสร็จสิ้น", icon: CheckCircle2 },
+  ];
+
+  const currentStep = statusConfig[status].step;
+
+  return (
+    <div className="flex items-center gap-0">
+      {steps.map((step, idx) => {
+        const isCompleted = currentStep > idx + 1;
+        const isCurrent = currentStep === idx + 1;
+        const Icon = step.icon;
+        return (
+          <div key={step.key} className="flex items-center flex-1">
+            <div className="flex flex-col items-center gap-1 flex-1">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                  isCompleted
+                    ? "bg-black border-black text-white"
+                    : isCurrent
+                    ? "bg-white border-black text-black"
+                    : "bg-gray-100 border-gray-300 text-gray-400"
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${isCurrent && step.key === "processing" ? "animate-spin" : ""}`} />
+              </div>
+              <span className={`text-xs font-medium text-center leading-tight ${isCurrent ? "text-black" : isCompleted ? "text-gray-600" : "text-gray-400"}`}>
+                {step.label}
+              </span>
+            </div>
+            {idx < steps.length - 1 && (
+              <div className={`h-0.5 flex-1 mb-5 mx-1 transition-all ${isCompleted ? "bg-black" : "bg-gray-200"}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>(mockOrders);
@@ -133,7 +329,7 @@ export function OrderManagement() {
   const [filterAccount, setFilterAccount] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  
+
   // Create Order Form States
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [selectedAccount, setSelectedAccount] = useState<string>("");
@@ -150,18 +346,13 @@ export function OrderManagement() {
     return matchesSearch && matchesStatus && matchesAccount;
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-gray-200 text-black";
-      case "processing":
-        return "bg-gray-400 text-white";
-      case "completed":
-        return "bg-black text-white";
-      case "cancelled":
-        return "bg-white text-black border border-black";
-      default:
-        return "bg-gray-200 text-black";
+      case "pending": return "bg-amber-100 text-amber-800 border border-amber-200";
+      case "processing": return "bg-blue-100 text-blue-800 border border-blue-200";
+      case "completed": return "bg-green-100 text-green-800 border border-green-200";
+      case "cancelled": return "bg-red-100 text-red-800 border border-red-200";
+      default: return "bg-gray-200 text-black";
     }
   };
 
@@ -181,16 +372,25 @@ export function OrderManagement() {
     const customer = mockCustomers.find(c => c.id === selectedCustomer);
     if (!customer) return;
 
-    const productNames = selectedProducts.map(sp => {
-      const product = mockProducts.find(p => p.id === sp.productId);
-      return product?.name || "";
-    }).filter(Boolean);
+    const items: OrderItem[] = selectedProducts
+      .filter(sp => sp.productId)
+      .map(sp => {
+        const product = mockProducts.find(p => p.id === sp.productId);
+        return {
+          productId: sp.productId,
+          productName: product?.name || "",
+          sku: `SKU-${sp.productId}`,
+          category: "General",
+          imageUrl: "",
+          quantity: sp.quantity,
+          unitPrice: product?.price || 0,
+          subtotal: (product?.price || 0) * sp.quantity,
+        };
+      });
 
-    const totalQuantity = selectedProducts.reduce((sum, sp) => sum + sp.quantity, 0);
-    const totalAmount = selectedProducts.reduce((sum, sp) => {
-      const product = mockProducts.find(p => p.id === sp.productId);
-      return sum + (product?.price || 0) * sp.quantity;
-    }, 0);
+    const productNames = items.map(i => i.productName).filter(Boolean);
+    const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
+    const totalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
 
     const newOrder: Order = {
       id: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
@@ -198,15 +398,15 @@ export function OrderManagement() {
       lineId: customer.lineId,
       lineAccount: selectedAccount,
       products: productNames,
+      items,
       quantity: totalQuantity,
-      totalAmount: totalAmount,
+      totalAmount,
       status: "pending",
       orderDate: new Date().toISOString().split("T")[0],
+      notes: orderNotes || undefined,
     };
 
     setOrders([newOrder, ...orders]);
-    
-    // Reset form
     setSelectedCustomer("");
     setSelectedAccount("");
     setSelectedProducts([]);
@@ -252,7 +452,7 @@ export function OrderManagement() {
             <CardTitle className="text-sm">Pending</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
+            <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
           </CardContent>
         </Card>
         <Card>
@@ -260,7 +460,7 @@ export function OrderManagement() {
             <CardTitle className="text-sm">Processing</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.processing}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
           </CardContent>
         </Card>
         <Card>
@@ -268,7 +468,7 @@ export function OrderManagement() {
             <CardTitle className="text-sm">Completed</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completed}</div>
+            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -293,7 +493,6 @@ export function OrderManagement() {
                   <DialogTitle>Create New Order</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6">
-                  {/* Customer Selection */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="customer">Customer *</Label>
@@ -325,21 +524,14 @@ export function OrderManagement() {
                     </div>
                   </div>
 
-                  {/* Products Selection */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <Label>Products *</Label>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        onClick={addProduct}
-                      >
+                      <Button type="button" variant="outline" size="sm" onClick={addProduct}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add Product
                       </Button>
                     </div>
-                    
                     <div className="space-y-3">
                       {selectedProducts.length === 0 ? (
                         <div className="text-center py-8 border border-dashed border-border rounded-lg">
@@ -351,10 +543,7 @@ export function OrderManagement() {
                             <div className="flex-1 grid grid-cols-2 gap-3">
                               <div>
                                 <Label className="text-xs">Product</Label>
-                                <Select
-                                  value={item.productId}
-                                  onValueChange={(value) => updateProduct(index, value, item.quantity)}
-                                >
+                                <Select value={item.productId} onValueChange={(value) => updateProduct(index, value, item.quantity)}>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select product" />
                                   </SelectTrigger>
@@ -384,13 +573,7 @@ export function OrderManagement() {
                                 </p>
                               </div>
                             )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeProduct(index)}
-                              className="mt-6"
-                            >
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeProduct(index)} className="mt-6">
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
@@ -399,7 +582,6 @@ export function OrderManagement() {
                     </div>
                   </div>
 
-                  {/* Order Notes */}
                   <div>
                     <Label htmlFor="notes">Order Notes (Optional)</Label>
                     <Textarea
@@ -411,7 +593,6 @@ export function OrderManagement() {
                     />
                   </div>
 
-                  {/* Total */}
                   {selectedProducts.length > 0 && (
                     <div className="border-t pt-4">
                       <div className="flex justify-between items-center">
@@ -421,26 +602,11 @@ export function OrderManagement() {
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex justify-end gap-3 border-t pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setIsCreateDialogOpen(false);
-                        setSelectedCustomer("");
-                        setSelectedAccount("");
-                        setSelectedProducts([]);
-                        setOrderNotes("");
-                      }}
-                    >
+                    <Button type="button" variant="outline" onClick={() => { setIsCreateDialogOpen(false); setSelectedCustomer(""); setSelectedAccount(""); setSelectedProducts([]); setOrderNotes(""); }}>
                       Cancel
                     </Button>
-                    <Button
-                      type="button"
-                      className="bg-black text-white hover:bg-gray-800"
-                      onClick={handleCreateOrder}
-                    >
+                    <Button type="button" className="bg-black text-white hover:bg-gray-800" onClick={handleCreateOrder}>
                       Create Order
                     </Button>
                   </div>
@@ -493,7 +659,8 @@ export function OrderManagement() {
                 <TableHead>Customer</TableHead>
                 <TableHead>LINE ID</TableHead>
                 <TableHead>Account</TableHead>
-                <TableHead>Quantity</TableHead>
+                <TableHead>Products</TableHead>
+                <TableHead>Total Qty</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
@@ -507,95 +674,186 @@ export function OrderManagement() {
                   <TableCell>{order.customerName}</TableCell>
                   <TableCell className="font-mono text-sm">{order.lineId}</TableCell>
                   <TableCell>{order.lineAccount}</TableCell>
-                  <TableCell>{order.quantity}</TableCell>
-                  <TableCell>฿{order.totalAmount.toLocaleString()}</TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(order.status)} variant="secondary">
-                      {order.status}
+                    <div className="flex -space-x-2">
+                      {order.items.slice(0, 3).map((item, idx) => (
+                        <div key={idx} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0">
+                          <ImageWithFallback src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                      {order.items.length > 3 && (
+                        <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
+                          +{order.items.length - 3}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{order.items.length} ประเภท</p>
+                  </TableCell>
+                  <TableCell>{order.quantity.toLocaleString()} ชิ้น</TableCell>
+                  <TableCell className="font-semibold">฿{order.totalAmount.toLocaleString()}</TableCell>
+                  <TableCell>
+                    <Badge className={`${getStatusBadgeClass(order.status)} text-xs`} variant="secondary">
+                      {statusConfig[order.status].label}
                     </Badge>
                   </TableCell>
-                  <TableCell>{order.orderDate}</TableCell>
+                  <TableCell>{new Date(order.orderDate).toLocaleDateString("th-TH")}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
+                      {/* ORDER DETAILS MODAL */}
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setSelectedOrder(order)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Order Details: {selectedOrder?.id}</DialogTitle>
-                          </DialogHeader>
+                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
                           {selectedOrder && (
-                            <div className="space-y-6">
-                              <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-4">
+                            <>
+                              {/* Header Banner */}
+                              <div className="bg-black text-white px-6 pt-6 pb-5 rounded-t-lg">
+                                <div className="flex items-start justify-between mb-4">
                                   <div>
-                                    <p className="text-sm text-muted-foreground">Customer</p>
-                                    <p className="font-medium text-lg">{selectedOrder.customerName}</p>
+                                    <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Order Details</p>
+                                    <h2 className="text-2xl font-bold font-mono">{selectedOrder.id}</h2>
                                   </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">LINE ID</p>
-                                    <p className="font-mono text-sm">{selectedOrder.lineId}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Account</p>
-                                    <p className="font-medium">{selectedOrder.lineAccount}</p>
-                                  </div>
+                                  <Badge className={`${getStatusBadgeClass(selectedOrder.status)} mt-1`} variant="secondary">
+                                    {statusConfig[selectedOrder.status].label}
+                                  </Badge>
                                 </div>
-                                <div className="space-y-4">
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Status</p>
-                                    <Badge className={getStatusColor(selectedOrder.status)}>
-                                      {selectedOrder.status}
-                                    </Badge>
+
+                                {/* Status Timeline */}
+                                <OrderStatusTimeline status={selectedOrder.status} />
+                              </div>
+
+                              <div className="p-6 space-y-6">
+                                {/* Order Info Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">ลูกค้า</span>
+                                    </div>
+                                    <p className="font-semibold text-sm">{selectedOrder.customerName}</p>
                                   </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Quantity</p>
-                                    <p className="font-medium text-lg">{selectedOrder.quantity} units</p>
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">LINE ID</span>
+                                    </div>
+                                    <p className="font-semibold text-sm font-mono">{selectedOrder.lineId}</p>
                                   </div>
-                                  <div>
-                                    <p className="text-sm text-muted-foreground">Total Amount</p>
-                                    <p className="font-medium text-lg">
-                                      ฿{selectedOrder.totalAmount.toLocaleString()}
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <Store className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">Store</span>
+                                    </div>
+                                    <p className="font-semibold text-sm">{selectedOrder.lineAccount}</p>
+                                  </div>
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <span className="text-xs text-muted-foreground">วันที่สั่ง</span>
+                                    </div>
+                                    <p className="font-semibold text-sm">
+                                      {new Date(selectedOrder.orderDate).toLocaleDateString("th-TH", {
+                                        day: "numeric", month: "short", year: "numeric"
+                                      })}
                                     </p>
                                   </div>
                                 </div>
-                              </div>
-                              
-                              <div className="border-t pt-4">
-                                <p className="text-sm text-muted-foreground mb-3">Products</p>
-                                <div className="bg-gray-50 rounded-lg p-4">
-                                  <ul className="space-y-2">
-                                    {selectedOrder.products.map((product, idx) => (
-                                      <li key={idx} className="flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-black rounded-full"></span>
-                                        <span className="font-medium">{product}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              </div>
 
-                              <div className="border-t pt-4">
-                                <p className="text-sm text-muted-foreground mb-2">Order Date</p>
-                                <p className="font-medium">
-                                  {new Date(selectedOrder.orderDate).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                  })}
-                                </p>
+                                {/* Products Section */}
+                                <div>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <ShoppingBag className="h-4 w-4" />
+                                    <h3 className="font-semibold">รายการสินค้า ({selectedOrder.items.length} ประเภท)</h3>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    {selectedOrder.items.map((item, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex gap-4 items-center p-4 border border-border rounded-xl hover:bg-gray-50 transition-colors"
+                                      >
+                                        {/* Product Image */}
+                                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                                          <ImageWithFallback
+                                            src={item.imageUrl}
+                                            alt={item.productName}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+
+                                        {/* Product Info */}
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-sm truncate">{item.productName}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-xs text-muted-foreground font-mono">{item.sku}</span>
+                                            <span className="text-muted-foreground">·</span>
+                                            <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                              <Tag className="h-2.5 w-2.5 mr-1" />
+                                              {item.category}
+                                            </Badge>
+                                          </div>
+                                          <p className="text-xs text-muted-foreground mt-1">
+                                            ฿{item.unitPrice.toLocaleString()} × {item.quantity.toLocaleString()} ชิ้น
+                                          </p>
+                                        </div>
+
+                                        {/* Quantity Badge */}
+                                        <div className="text-center shrink-0">
+                                          <div className="bg-black text-white rounded-lg px-3 py-1.5 min-w-[60px]">
+                                            <p className="text-lg font-bold leading-none">{item.quantity.toLocaleString()}</p>
+                                            <p className="text-[10px] text-gray-300 mt-0.5">ชิ้น</p>
+                                          </div>
+                                        </div>
+
+                                        {/* Subtotal */}
+                                        <div className="text-right shrink-0">
+                                          <p className="font-bold text-sm">฿{item.subtotal.toLocaleString()}</p>
+                                          <p className="text-xs text-muted-foreground">ยอดรวม</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Summary */}
+                                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                                  <h3 className="font-semibold text-sm">สรุปคำสั่งซื้อ</h3>
+                                  <div className="space-y-2">
+                                    {selectedOrder.items.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground truncate max-w-[60%]">{item.productName}</span>
+                                        <span>฿{item.subtotal.toLocaleString()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
+                                    <div>
+                                      <span className="text-sm text-muted-foreground">รวมทั้งหมด </span>
+                                      <span className="text-sm font-medium">{selectedOrder.quantity.toLocaleString()} ชิ้น</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-xs text-muted-foreground">ยอดสุทธิ</p>
+                                      <p className="text-2xl font-bold">฿{selectedOrder.totalAmount.toLocaleString()}</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Notes */}
+                                {selectedOrder.notes && (
+                                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                    <p className="text-xs font-semibold text-amber-700 mb-1">📝 หมายเหตุ</p>
+                                    <p className="text-sm text-amber-800">{selectedOrder.notes}</p>
+                                  </div>
+                                )}
                               </div>
-                            </div>
+                            </>
                           )}
                         </DialogContent>
                       </Dialog>
+
                       <Button variant="ghost" size="sm">
                         <Edit className="h-4 w-4" />
                       </Button>
