@@ -1,13 +1,33 @@
-import { useState } from "react";
-import { Package, Users, Receipt, ShoppingBag, MessageSquare } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Package, Users, Receipt, ShoppingBag, MessageSquare, Tag } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import { OrderManagement } from "@/app/components/order-management";
 import { BillingManagement } from "@/app/components/billing-management";
 import { CustomerManagement } from "@/app/components/customer-management";
 import { ProductManagement } from "@/app/components/product-management";
+import { PromotionManagement } from "@/app/components/promotion-management";
+import { api } from "@/app/utils/api";
 
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("orders");
+  const [orderStats, setOrderStats] = useState<any>(null);
+  const [billStats, setBillStats] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [oStats, bStats] = await Promise.all([
+          api.get("/orders/stats"),
+          api.get("/bills/stats"),
+        ]);
+        setOrderStats(oStats);
+        setBillStats(bStats);
+      } catch (err) {
+        console.error("Failed to fetch stats", err);
+      }
+    };
+    fetchStats();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -24,8 +44,12 @@ export function AdminDashboard() {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm">Connected Accounts: 3</p>
-                <p className="text-xs text-gray-400">Store 1, Store 2, Store 3</p>
+                <p className="text-sm">
+                  Total Revenue: ฿{billStats?.totalRevenue?.toLocaleString() || "0"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {orderStats?.total || "0"} Orders · {billStats?.paid || "0"} Paid
+                </p>
               </div>
             </div>
           </div>
@@ -35,7 +59,7 @@ export function AdminDashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8 bg-black/5">
+          <TabsList className="grid w-full grid-cols-5 mb-8 bg-black/5">
             <TabsTrigger value="orders" className="gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <Package className="h-4 w-4" />
               Orders
@@ -51,6 +75,10 @@ export function AdminDashboard() {
             <TabsTrigger value="products" className="gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <ShoppingBag className="h-4 w-4" />
               Products
+            </TabsTrigger>
+            <TabsTrigger value="promotions" className="gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
+              <Tag className="h-4 w-4" />
+              Promotions
             </TabsTrigger>
           </TabsList>
 
@@ -68,6 +96,10 @@ export function AdminDashboard() {
 
           <TabsContent value="products">
             <ProductManagement />
+          </TabsContent>
+
+          <TabsContent value="promotions">
+            <PromotionManagement />
           </TabsContent>
         </Tabs>
       </main>

@@ -16,4 +16,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: [
+      'charissa-nonparochial-timmy.ngrok-free.dev'
+    ]
+  }
 })

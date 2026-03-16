@@ -9,7 +9,6 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<AdminDashboard />} />
-          <Route path="/product-catalog/:customerId" element={<ProductCatalog />} />
         </Routes>
       </BrowserRouter>
     </PasswordGate>

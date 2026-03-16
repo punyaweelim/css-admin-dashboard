@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Users,
   Search,
@@ -15,6 +15,13 @@ import {
   X,
   Check,
   Pencil,
+  Loader2,
+  Image as ImageIcon,
+  History,
+  Repeat,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
@@ -45,16 +52,37 @@ import {
   SelectValue,
 } from "@/app/components/ui/select";
 import { Checkbox } from "@/app/components/ui/checkbox";
+import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import { api } from "@/app/utils/api";
+import { toast } from "sonner";
+import { Textarea } from "@/app/components/ui/textarea"
 
 type CustomerTier = "bronze" | "silver" | "gold" | "platinum";
 
+interface OrderItem {
+  productId: string;
+  productName: string;
+  sku: string;
+  category: string;
+  imageUrl: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
 interface Order {
   id: string;
-  date: string;
-  products: string[];
+  customerId: string;
+  customerName: string;
+  lineId: string;
+  lineAccount: string;
+  storeId: string;
+  items: OrderItem[];
   quantity: number;
-  amount: number;
+  totalAmount: number;
   status: string;
+  orderDate: string;
+  notes?: string;
 }
 
 interface StoreAccess {
@@ -67,7 +95,8 @@ interface CustomProductPrice {
   productId: string;
   productName: string;
   sku: string;
-  originalPrice: number; // tier-based price
+  imageUrl?: string;
+  originalPrice: number;
   customPrice: number;
   note?: string;
 }
@@ -79,66 +108,15 @@ interface Customer {
   storeAccess: StoreAccess[];
   phone: string;
   email: string;
+  receiptAddress?: string;
+  taxId?: string;
+  defaultWithTax?: boolean;
   totalOrders: number;
   totalSpent: number;
   registeredDate: string;
   status: "active" | "inactive";
-  recentOrders?: Order[];
-  topProducts?: { name: string; quantity: number; times: number }[];
   customPrices?: CustomProductPrice[];
 }
-
-// All available products (from product catalog)
-const allProducts = [
-  {
-    id: "PROD-001",
-    name: "Product A",
-    sku: "SKU-A001",
-    category: "Electronics",
-    tierPricing: { bronze: 300, silver: 280, gold: 260, platinum: 240 },
-    storeId: "store1",
-  },
-  {
-    id: "PROD-002",
-    name: "Product B",
-    sku: "SKU-B002",
-    category: "Home & Garden",
-    tierPricing: { bronze: 150, silver: 140, gold: 130, platinum: 120 },
-    storeId: "store1",
-  },
-  {
-    id: "PROD-003",
-    name: "Product C",
-    sku: "SKU-C003",
-    category: "Fashion",
-    tierPricing: { bronze: 400, silver: 375, gold: 350, platinum: 325 },
-    storeId: "store2",
-  },
-  {
-    id: "PROD-004",
-    name: "Product D",
-    sku: "SKU-D004",
-    category: "Beauty",
-    tierPricing: { bronze: 250, silver: 235, gold: 220, platinum: 205 },
-    storeId: "store2",
-  },
-  {
-    id: "PROD-005",
-    name: "Product E",
-    sku: "SKU-E005",
-    category: "Electronics",
-    tierPricing: { bronze: 500, silver: 470, gold: 440, platinum: 410 },
-    storeId: "store2",
-  },
-  {
-    id: "PROD-006",
-    name: "Product F",
-    sku: "SKU-F006",
-    category: "Sports",
-    tierPricing: { bronze: 350, silver: 330, gold: 310, platinum: 290 },
-    storeId: "store3",
-  },
-];
 
 const tierInfo: Record<CustomerTier, { emoji: string; name: string; color: string; bg: string }> = {
   bronze: { emoji: "🥉", name: "Bronze", color: "text-orange-700", bg: "bg-orange-100" },
@@ -148,473 +126,157 @@ const tierInfo: Record<CustomerTier, { emoji: string; name: string; color: strin
 };
 
 const availableStores = [
-  { id: "store1", name: "Store Account 1" },
-  { id: "store2", name: "Store Account 2" },
-  { id: "store3", name: "Store Account 3" },
+  { id: "3a", name: "Store 3A" },
+  { id: "tong3", name: "Store Tong 3" },
+  { id: "4thit", name: "Store 4Thit" },
 ];
 
-const mockCustomers: Customer[] = [
-  {
-    id: "CUST-001",
-    name: "สมชาย ใจดี",
-    lineId: "LINE-123456",
-    storeAccess: [{ storeId: "store1", storeName: "Store Account 1", tier: "gold" }],
-    phone: "081-234-5678",
-    email: "somchai@example.com",
-    totalOrders: 5,
-    totalSpent: 125000,
-    registeredDate: "2025-11-15",
-    status: "active",
-    customPrices: [
-      {
-        productId: "PROD-001",
-        productName: "Product A",
-        sku: "SKU-A001",
-        originalPrice: 260,
-        customPrice: 245,
-        note: "VIP deal",
-      },
-    ],
-    recentOrders: [
-      { id: "ORD-001", date: "2025-11-15", products: ["Product A", "Product B"], quantity: 2, amount: 50000, status: "completed" },
-      { id: "ORD-002", date: "2025-11-16", products: ["Product C"], quantity: 1, amount: 25000, status: "completed" },
-    ],
-    topProducts: [
-      { name: "Product A", quantity: 10, times: 2 },
-      { name: "Product B", quantity: 5, times: 2 },
-      { name: "Product C", quantity: 3, times: 1 },
-    ],
-  },
-  {
-    id: "CUST-002",
-    name: "สมหญิง รักสวย",
-    lineId: "LINE-789012",
-    storeAccess: [
-      { storeId: "store2", storeName: "Store Account 2", tier: "platinum" },
-      { storeId: "store3", storeName: "Store Account 3", tier: "silver" },
-    ],
-    phone: "082-345-6789",
-    email: "somying@example.com",
-    totalOrders: 8,
-    totalSpent: 240000,
-    registeredDate: "2025-10-20",
-    status: "active",
-    customPrices: [],
-    recentOrders: [
-      { id: "ORD-003", date: "2025-10-20", products: ["Product D", "Product E"], quantity: 3, amount: 75000, status: "completed" },
-      { id: "ORD-004", date: "2025-10-21", products: ["Product F"], quantity: 1, amount: 45000, status: "completed" },
-    ],
-    topProducts: [
-      { name: "Product D", quantity: 15, times: 3 },
-      { name: "Product E", quantity: 10, times: 3 },
-      { name: "Product F", quantity: 5, times: 1 },
-    ],
-  },
-  {
-    id: "CUST-003",
-    name: "วิชัย ประเสริฐ",
-    lineId: "LINE-345678",
-    storeAccess: [{ storeId: "store3", storeName: "Store Account 3", tier: "silver" }],
-    phone: "083-456-7890",
-    email: "wichai@example.com",
-    totalOrders: 3,
-    totalSpent: 85000,
-    registeredDate: "2025-12-01",
-    status: "active",
-    customPrices: [],
-    recentOrders: [
-      { id: "ORD-005", date: "2025-12-01", products: ["Product G"], quantity: 2, amount: 40000, status: "completed" },
-    ],
-    topProducts: [{ name: "Product G", quantity: 8, times: 2 }],
-  },
-  {
-    id: "CUST-004",
-    name: "อรุณี สวัสดี",
-    lineId: "LINE-901234",
-    storeAccess: [
-      { storeId: "store1", storeName: "Store Account 1", tier: "bronze" },
-      { storeId: "store2", storeName: "Store Account 2", tier: "gold" },
-    ],
-    phone: "084-567-8901",
-    email: "arunee@example.com",
-    totalOrders: 1,
-    totalSpent: 25000,
-    registeredDate: "2026-01-10",
-    status: "active",
-    customPrices: [],
-    recentOrders: [
-      { id: "ORD-006", date: "2026-01-10", products: ["Product H"], quantity: 1, amount: 25000, status: "completed" },
-    ],
-    topProducts: [{ name: "Product H", quantity: 3, times: 1 }],
-  },
-];
+const ITEMS_PER_PAGE = 10;
 
 // ─────────────────────────────────────────────────────────────
-// Sub-component: Customize Product Price Box
+// Sub-component: Customer Form
 // ─────────────────────────────────────────────────────────────
-interface CustomizePriceBoxProps {
-  customer: Customer;
-  onUpdate: (updated: Customer) => void;
+interface CustomerFormProps {
+  customer?: Customer;
+  onCancel: () => void;
+  onSubmit: (data: any) => void;
 }
 
-function CustomizePriceBox({ customer, onUpdate }: CustomizePriceBoxProps) {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+function CustomerForm({ customer, onCancel, onSubmit }: CustomerFormProps) {
+  const [formStoreAccess, setFormStoreAccess] = useState<StoreAccess[]>([]);
+  const [defaultWithTax, setDefaultWithTax] = useState<boolean>(customer?.defaultWithTax || false);
 
-  // Form state for adding/editing
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [customPriceInput, setCustomPriceInput] = useState("");
-  const [noteInput, setNoteInput] = useState("");
-  const [editCustomPrice, setEditCustomPrice] = useState("");
-  const [editNote, setEditNote] = useState("");
+  useEffect(() => {
+    if (customer) {
+      setFormStoreAccess(customer.storeAccess || []);
+      setDefaultWithTax(!!customer.defaultWithTax);
+    } else {
+      setFormStoreAccess([]);
+      setDefaultWithTax(false);
+    }
+  }, [customer]);
 
-  const customPrices = customer.customPrices ?? [];
-
-  // Get products that are accessible by this customer's stores
-  const accessibleStoreIds = customer.storeAccess.map((s) => s.storeId);
-  const availableProductsForCustomer = allProducts.filter((p) =>
-    accessibleStoreIds.includes(p.storeId)
-  );
-
-  // Already-assigned product ids
-  const assignedProductIds = customPrices.map((cp) => cp.productId);
-  const unassignedProducts = availableProductsForCustomer.filter(
-    (p) => !assignedProductIds.includes(p.id)
-  );
-
-  // Get the customer's tier for a given product's store
-  const getTierPrice = (product: typeof allProducts[0]) => {
-    const storeAccess = customer.storeAccess.find((s) => s.storeId === product.storeId);
-    if (!storeAccess) return product.tierPricing.bronze;
-    return product.tierPricing[storeAccess.tier];
+  const toggleStoreAccess = (storeId: string, storeName: string) => {
+    setFormStoreAccess((prev) => {
+      const exists = prev.find((sa) => sa.storeId === storeId);
+      if (exists) {
+        return prev.filter((sa) => sa.storeId !== storeId);
+      }
+      return [...prev, { storeId, storeName, tier: "bronze" }];
+    });
   };
 
-  const selectedProduct = allProducts.find((p) => p.id === selectedProductId);
-
-  const handleAddCustomPrice = () => {
-    if (!selectedProductId || !customPriceInput) return;
-    const product = allProducts.find((p) => p.id === selectedProductId);
-    if (!product) return;
-
-    const newEntry: CustomProductPrice = {
-      productId: product.id,
-      productName: product.name,
-      sku: product.sku,
-      originalPrice: getTierPrice(product),
-      customPrice: parseFloat(customPriceInput),
-      note: noteInput || undefined,
-    };
-
-    const updated: Customer = {
-      ...customer,
-      customPrices: [...customPrices, newEntry],
-    };
-    onUpdate(updated);
-    setIsAddDialogOpen(false);
-    setSelectedProductId("");
-    setCustomPriceInput("");
-    setNoteInput("");
+  const updateTier = (storeId: string, tier: CustomerTier) => {
+    setFormStoreAccess((prev) =>
+      prev.map((sa) => (sa.storeId === storeId ? { ...sa, tier } : sa))
+    );
   };
 
-  const handleSaveEdit = (productId: string) => {
-    const updated: Customer = {
-      ...customer,
-      customPrices: customPrices.map((cp) =>
-        cp.productId === productId
-          ? { ...cp, customPrice: parseFloat(editCustomPrice), note: editNote || undefined }
-          : cp
-      ),
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get("name") as string,
+      lineId: formData.get("lineId") as string,
+      storeAccess: formStoreAccess,
+      phone: formData.get("phone") as string,
+      email: formData.get("email") as string,
+      receiptAddress: formData.get("receiptAddress") as string,
+      taxId: formData.get("taxId") as string,
+      defaultWithTax: defaultWithTax,
+      status: customer ? (customer.status) : "active",
     };
-    onUpdate(updated);
-    setEditingId(null);
-  };
-
-  const handleDelete = (productId: string) => {
-    const updated: Customer = {
-      ...customer,
-      customPrices: customPrices.filter((cp) => cp.productId !== productId),
-    };
-    onUpdate(updated);
-  };
-
-  const startEdit = (cp: CustomProductPrice) => {
-    setEditingId(cp.productId);
-    setEditCustomPrice(String(cp.customPrice));
-    setEditNote(cp.note ?? "");
+    onSubmit(data);
   };
 
   return (
-    <Card className="mt-6">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Tag className="h-5 w-5" />
-            Customize Product Price for customer
-          </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                className="bg-black text-white hover:bg-gray-800"
-                disabled={unassignedProducts.length === 0}
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Full Name</Label>
+          <Input id="name" name="name" defaultValue={customer?.name} required />
+        </div>
+        <div>
+          <Label htmlFor="lineId">LINE ID</Label>
+          <Input id="lineId" name="lineId" defaultValue={customer?.lineId} required />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div><Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" defaultValue={customer?.phone} required /></div>
+        <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" defaultValue={customer?.email} required /></div>
+      </div>
+      <div>
+        <Label htmlFor="taxId">Taxpayer Identification Number (Tax ID)</Label>
+        <Input id="taxId" name="taxId" defaultValue={customer?.taxId} placeholder="e.g. 1234567890123" />
+      </div>
+      <div>
+        <Label htmlFor="receiptAddress">Receipt Address</Label>
+        <Textarea id="receiptAddress" name="receiptAddress" defaultValue={customer?.receiptAddress} placeholder="Enter full address for billing..." rows={3} />
+      </div>
+      <div className="flex items-center space-x-2 bg-gray-50 p-4 rounded-xl border border-gray-100">
+        <Checkbox id="defaultWithTax" checked={defaultWithTax} onCheckedChange={(checked) => setDefaultWithTax(!!checked)} />
+        <div className="grid gap-1.5 leading-none">
+          <label htmlFor="defaultWithTax" className="text-sm font-bold leading-none cursor-pointer">
+            Default VAT Calculation
+          </label>
+          <p className="text-[10px] text-muted-foreground font-medium">
+            Automatically check "Calculate VAT (7%)" when processing orders for this customer.
+          </p>
+        </div>
+      </div>
+      <div>
+        <Label className="mb-2 block">Store Access & Tier</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {availableStores.map((store) => {
+            const access = formStoreAccess.find((sa) => sa.storeId === store.id);
+            return (
+              <div
+                key={store.id}
+                className={`p-3 rounded-xl border-2 transition-all ${
+                  access ? "border-black bg-black/5 shadow-sm" : "border-gray-100 bg-gray-50/50"
+                }`}
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Custom Price
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add Custom Product Price</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                {/* Product selector */}
-                <div>
-                  <Label className="mb-1 block">Product</Label>
-                  <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id={`store-${store.id}`}
+                    checked={!!access}
+                    onCheckedChange={() => toggleStoreAccess(store.id, store.name)}
+                    className="data-[state=checked]:bg-black data-[state=checked]:border-black"
+                  />
+                  <Label htmlFor={`store-${store.id}`} className="font-bold text-xs cursor-pointer">
+                    {store.name}
+                  </Label>
+                </div>
+                {access && (
+                  <Select
+                    value={access.tier}
+                    onValueChange={(v) => updateTier(store.id, v as CustomerTier)}
+                  >
+                    <SelectTrigger className="h-8 text-[10px] bg-white border-black/10">
+                      <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      {unassignedProducts.map((p) => {
-                        const tierPrice = getTierPrice(p);
-                        return (
-                          <SelectItem key={p.id} value={p.id}>
-                            <div className="flex flex-col">
-                              <span className="font-semibold">{p.name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {p.sku} · Tier price: ฿{tierPrice}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
+                    <SelectContent className="bg-white text-black">
+                      <SelectItem value="bronze">🥉 Bronze</SelectItem>
+                      <SelectItem value="silver">🥈 Silver</SelectItem>
+                      <SelectItem value="gold">🥇 Gold</SelectItem>
+                      <SelectItem value="platinum">💎 Platinum</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                {/* Show tier info */}
-                {selectedProduct && (
-                  <div className="rounded-lg bg-gray-50 p-3 text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tier Price</span>
-                      <span className="font-semibold">฿{getTierPrice(selectedProduct)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Store</span>
-                      <span>
-                        {customer.storeAccess.find((s) => s.storeId === selectedProduct.storeId)?.storeName}
-                      </span>
-                    </div>
-                  </div>
                 )}
-
-                {/* Custom price input */}
-                <div>
-                  <Label htmlFor="customPrice" className="mb-1 block">
-                    Custom Price (฿)
-                  </Label>
-                  <Input
-                    id="customPrice"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Enter custom price"
-                    value={customPriceInput}
-                    onChange={(e) => setCustomPriceInput(e.target.value)}
-                  />
-                  {selectedProduct && customPriceInput && (
-                    <p className="text-xs mt-1">
-                      {parseFloat(customPriceInput) < getTierPrice(selectedProduct) ? (
-                        <span className="text-green-600">
-                          ลดลง ฿{(getTierPrice(selectedProduct) - parseFloat(customPriceInput)).toFixed(2)} จากราคา Tier
-                        </span>
-                      ) : parseFloat(customPriceInput) > getTierPrice(selectedProduct) ? (
-                        <span className="text-red-500">
-                          สูงกว่าราคา Tier ฿{(parseFloat(customPriceInput) - getTierPrice(selectedProduct)).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">เท่ากับราคา Tier</span>
-                      )}
-                    </p>
-                  )}
-                </div>
-
-                {/* Note */}
-                <div>
-                  <Label htmlFor="note" className="mb-1 block">
-                    Note (Optional)
-                  </Label>
-                  <Input
-                    id="note"
-                    placeholder="e.g. Special deal, VIP discount"
-                    value={noteInput}
-                    onChange={(e) => setNoteInput(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    className="bg-black text-white hover:bg-gray-800"
-                    onClick={handleAddCustomPrice}
-                    disabled={!selectedProductId || !customPriceInput}
-                  >
-                    Add Price
-                  </Button>
-                </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            );
+          })}
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          ตั้งราคาพิเศษสำหรับสินค้าเฉพาะลูกค้ารายนี้ (Override ราคา Tier ปกติ)
-        </p>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        {customPrices.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-border rounded-lg">
-            <Tag className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">ยังไม่มีราคาพิเศษสำหรับลูกค้าคนนี้</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              คลิก "Add Custom Price" เพื่อกำหนดราคาพิเศษ
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Tier Price</TableHead>
-                <TableHead>Custom Price</TableHead>
-                <TableHead>Difference</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {customPrices.map((cp) => {
-                const diff = cp.customPrice - cp.originalPrice;
-                const isEditing = editingId === cp.productId;
-                return (
-                  <TableRow key={cp.productId}>
-                    <TableCell>
-                      <div>
-                        <p className="font-semibold text-sm">{cp.productName}</p>
-                        <p className="text-xs text-muted-foreground">{cp.sku}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      ฿{cp.originalPrice.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          className="w-28 h-8 text-sm"
-                          value={editCustomPrice}
-                          onChange={(e) => setEditCustomPrice(e.target.value)}
-                          autoFocus
-                        />
-                      ) : (
-                        <span className="font-semibold text-black">
-                          ฿{cp.customPrice.toLocaleString()}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {diff < 0 ? (
-                        <Badge className="bg-green-100 text-green-700 border-0">
-                          -฿{Math.abs(diff).toLocaleString()}
-                        </Badge>
-                      ) : diff > 0 ? (
-                        <Badge className="bg-red-100 text-red-700 border-0">
-                          +฿{diff.toLocaleString()}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">same</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <Input
-                          className="w-32 h-8 text-sm"
-                          value={editNote}
-                          onChange={(e) => setEditNote(e.target.value)}
-                          placeholder="Note..."
-                        />
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          {cp.note ?? "—"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-green-600 hover:text-green-700"
-                              onClick={() => handleSaveEdit(cp.productId)}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setEditingId(null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => startEdit(cp)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-500 hover:text-red-600"
-                              onClick={() => handleDelete(cp.productId)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-
-        {/* Summary */}
-        {customPrices.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {customPrices.length} product{customPrices.length > 1 ? "s" : ""} with custom pricing
-            </span>
-            <span className="font-medium">
-              {customPrices.filter((cp) => cp.customPrice < cp.originalPrice).length} discounted ·{" "}
-              {customPrices.filter((cp) => cp.customPrice > cp.originalPrice).length} marked up
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" className="bg-black text-white">
+          {customer ? "Update Customer" : "Add Customer"}
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -622,566 +284,620 @@ function CustomizePriceBox({ customer, onUpdate }: CustomizePriceBoxProps) {
 // Main Component
 // ─────────────────────────────────────────────────────────────
 export function CustomerManagement() {
-  const navigate = useNavigate();
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [formStoreAccess, setFormStoreAccess] = useState<StoreAccess[]>([]);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditingDialogOpen] = useState(false);
+  const [isCustomPriceDialogOpen, setIsCustomPriceDialogOpen] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredCustomers = customers.filter(
-    (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.lineId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    fetchCustomers();
+    fetchProducts();
+  }, []);
 
-  const handleUpdateCustomer = (updated: Customer) => {
-    setCustomers(customers.map((c) => (c.id === updated.id ? updated : c)));
-    setSelectedCustomer(updated);
-  };
-
-  const handleAddCustomer = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newCustomer: Customer = {
-      id: `CUST-${String(customers.length + 1).padStart(3, "0")}`,
-      name: formData.get("name") as string,
-      lineId: formData.get("lineId") as string,
-      storeAccess: formStoreAccess,
-      phone: formData.get("phone") as string,
-      email: formData.get("email") as string,
-      totalOrders: 0,
-      totalSpent: 0,
-      registeredDate: new Date().toISOString().split("T")[0],
-      status: "active",
-      customPrices: [],
-    };
-    setCustomers([...customers, newCustomer]);
-    setIsAddDialogOpen(false);
-    setFormStoreAccess([]);
-  };
-
-  const handleEditCustomer = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingCustomer) return;
-    const formData = new FormData(e.currentTarget);
-    const updatedCustomer: Customer = {
-      ...editingCustomer,
-      name: formData.get("name") as string,
-      lineId: formData.get("lineId") as string,
-      storeAccess: formStoreAccess,
-      phone: formData.get("phone") as string,
-      email: formData.get("email") as string,
-      status: formData.get("status") as "active" | "inactive",
-    };
-    setCustomers(customers.map((c) => (c.id === editingCustomer.id ? updatedCustomer : c)));
-    setEditingCustomer(null);
-    setFormStoreAccess([]);
-  };
-
-  const handleDeleteCustomer = (id: string) => {
-    setCustomers(customers.filter((c) => c.id !== id));
-  };
-
-  const toggleStoreAccess = (storeId: string, storeName: string) => {
-    const existingIndex = formStoreAccess.findIndex((s) => s.storeId === storeId);
-    if (existingIndex >= 0) {
-      setFormStoreAccess(formStoreAccess.filter((s) => s.storeId !== storeId));
-    } else {
-      setFormStoreAccess([...formStoreAccess, { storeId, storeName, tier: "bronze" }]);
+  const fetchCustomers = async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get<any>("/customers?limit=1000");
+      setCustomers(res.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch customers");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const updateStoreTier = (storeId: string, tier: CustomerTier) => {
-    setFormStoreAccess(
-      formStoreAccess.map((s) => (s.storeId === storeId ? { ...s, tier } : s))
-    );
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get<any>("/products?limit=1000");
+      setProducts(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch products");
+    }
   };
 
-  const CustomerForm = ({ customer }: { customer?: Customer }) => {
-    useState(() => {
-      if (customer) {
-        setFormStoreAccess(customer.storeAccess);
-      } else {
-        setFormStoreAccess([]);
+  const fetchOrderHistory = async (customerId: string) => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await api.get<any>(`/orders?customerId=${customerId}`);
+      setOrderHistory(res.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch order history");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleAddCustomer = async (data: any) => {
+    try {
+      await api.post("/customers", data);
+      setIsAddDialogOpen(false);
+      fetchCustomers();
+      toast.success("Customer added successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add customer");
+    }
+  };
+
+  const handleUpdateCustomer = async (data: any) => {
+    if (!selectedCustomer) return;
+    try {
+      await api.put(`/customers/${selectedCustomer.id}`, data);
+      setIsEditingDialogOpen(false);
+      const updated = await api.get<any>(`/customers/${selectedCustomer.id}`);
+      setSelectedCustomer(updated.data);
+      fetchCustomers();
+      toast.success("Customer updated successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update customer");
+    }
+  };
+
+  const handleToggleStatus = async (customer: Customer) => {
+    try {
+      const newStatus = customer.status === "active" ? "inactive" : "active";
+      await api.put(`/customers/${customer.id}`, { status: newStatus });
+      fetchCustomers();
+      if (selectedCustomer?.id === customer.id) {
+        setSelectedCustomer({ ...selectedCustomer, status: newStatus });
       }
-    });
+      toast.success(`Customer status updated to ${newStatus}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update status");
+    }
+  };
 
-    return (
-      <form onSubmit={customer ? handleEditCustomer : handleAddCustomer} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" name="name" defaultValue={customer?.name} required />
-          </div>
-          <div>
-            <Label htmlFor="lineId">LINE ID</Label>
-            <Input id="lineId" name="lineId" defaultValue={customer?.lineId} required />
-          </div>
-        </div>
+  const handleUpdateCustomPrices = async (newPrices: CustomProductPrice[]) => {
+    if (!selectedCustomer) return;
+    try {
+      const customPrices = newPrices.map(p => ({
+        productId: p.productId,
+        customPrice: p.customPrice,
+        note: p.note
+      }));
+      await api.put(`/customers/${selectedCustomer.id}`, { customPrices });
+      const updated = await api.get<any>(`/customers/${selectedCustomer.id}`);
+      setSelectedCustomer(updated.data);
+      fetchCustomers();
+      toast.success("Custom prices updated");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update custom prices");
+    }
+  };
 
-        <div>
-          <Label className="mb-2 block">Store Access & Membership Tier</Label>
-          <div className="space-y-3 border border-border rounded-lg p-4">
-            {availableStores.map((store) => {
-              const isSelected = formStoreAccess.some((s) => s.storeId === store.id);
-              const storeData = formStoreAccess.find((s) => s.storeId === store.id);
-              return (
-                <div key={store.id} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={store.id}
-                      checked={isSelected}
-                      onCheckedChange={() => toggleStoreAccess(store.id, store.name)}
-                    />
-                    <Label htmlFor={store.id} className="cursor-pointer flex-1">
-                      {store.name}
-                    </Label>
-                  </div>
-                  {isSelected && (
-                    <div className="ml-6">
-                      <Select
-                        value={storeData?.tier || "bronze"}
-                        onValueChange={(value) => updateStoreTier(store.id, value as CustomerTier)}
+  const filteredCustomers = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.lineId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+  const paginatedCustomers = filteredCustomers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-200px)]">
+      {/* Left: Customer List */}
+      <Card className={`flex-1 shadow-sm border-gray-100 flex flex-col overflow-hidden ${selectedCustomer ? 'hidden lg:flex' : ''}`}>
+        <CardHeader className="border-b border-gray-50 bg-white sticky top-0 z-10">
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle className="text-xl font-black">Customer Directory</CardTitle>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-black text-white hover:bg-gray-800 rounded-xl px-4 h-10 shadow-lg shadow-black/20">
+                  <UserPlus className="h-4 w-4 mr-2" /> Add New
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Register New Customer</DialogTitle></DialogHeader>
+                <CustomerForm onCancel={() => setIsAddDialogOpen(false)} onSubmit={handleAddCustomer} />
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search customers by name, LINE, or email..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="pl-10 h-11 bg-gray-50 border-gray-100 rounded-xl"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0 overflow-y-auto flex-1">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-2"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /><p className="text-sm text-muted-foreground">Loading customers...</p></div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader className="bg-gray-50/50">
+                  <TableRow>
+                    <TableHead className="py-4">Customer</TableHead>
+                    <TableHead>Access</TableHead>
+                    <TableHead className="text-center">Orders</TableHead>
+                    <TableHead>Spent</TableHead>
+                    <TableHead className="text-right pr-6">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCustomers.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">ไม่พบรายชื่อลูกค้า</TableCell></TableRow>
+                  ) : (
+                    paginatedCustomers.map((c) => (
+                      <TableRow
+                        key={c.id}
+                        className={`cursor-pointer hover:bg-gray-50/50 transition-all ${
+                          selectedCustomer?.id === c.id ? "bg-black/5" : ""
+                        }`}
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          fetchOrderHistory(c.id);
+                        }}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select tier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(tierInfo).map(([tier, info]) => (
-                            <SelectItem key={tier} value={tier}>
-                              <div className="flex items-center gap-2">
-                                <span>{info.emoji}</span>
-                                <span>{info.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-xs font-black shadow-sm">
+                              {c.name.substring(0, 2)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-black text-sm">{c.name}</div>
+                              <div className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{c.lineId}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {c.storeAccess.map((sa, i) => (
+                              <Badge key={i} variant="outline" className={`text-[8px] font-black uppercase ${tierInfo[sa.tier].color} ${tierInfo[sa.tier].bg} border-0 h-4`}>
+                                {sa.storeName.replace("Store Account ", "S")}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-xs">{c.totalOrders}</TableCell>
+                        <TableCell className="font-black text-xs">฿{c.totalSpent.toLocaleString()}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <div
+                            onClick={(e) => { e.stopPropagation(); handleToggleStatus(c); }}
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                              c.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                            }`}
+                          >
+                            {c.status}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
+                </TableBody>
+              </Table>
+
+              {/* Pagination UI */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-50 bg-white sticky bottom-0">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredCustomers.length)} of {filteredCustomers.length}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 rounded-lg border-gray-100"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-3 w-3" />
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                      const isVisible = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                      if (!isVisible) return null;
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          className={`h-7 w-7 p-0 rounded-lg text-[10px] font-bold ${
+                            currentPage === page ? "bg-black text-white" : "border-gray-100 text-gray-400 hover:text-black"
+                          }`}
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 w-7 p-0 rounded-lg border-gray-100"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Right: Detailed View */}
+      {selectedCustomer ? (
+        <Card className="flex-1 shadow-2xl border-black shadow-black/5 overflow-hidden flex flex-col bg-white">
+          <CardHeader className="bg-black text-white p-6 sticky top-0 z-10">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/10 lg:hidden"
+                  onClick={() => setSelectedCustomer(null)}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-xl font-black border border-white/20">
+                  {selectedCustomer.name.substring(0, 2)}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight">{selectedCustomer.name}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className="bg-green-400 text-black border-0 font-black text-[9px] uppercase h-5">
+                      {selectedCustomer.status}
+                    </Badge>
+                    <p className="text-white/40 text-xs font-mono uppercase tracking-widest">
+                      ID: {selectedCustomer.id}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditingDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="bg-white/5 border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl h-10 px-4">
+                      <Pencil className="h-4 w-4 mr-2" /> Edit Info
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>Edit Customer Information</DialogTitle></DialogHeader>
+                    <CustomerForm
+                      customer={selectedCustomer}
+                      onCancel={() => setIsEditingDialogOpen(false)}
+                      onSubmit={handleUpdateCustomer}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0 overflow-y-auto flex-1">
+            <div className="p-6 space-y-8">
+              {/* Top Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-[2rem] p-5 border border-gray-100 flex flex-col items-center justify-center text-center group hover:bg-black hover:border-black transition-all duration-500 shadow-sm">
+                  <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-md mb-3 group-hover:scale-110 group-hover:rotate-6 transition-all">
+                    <ShoppingCart className="h-5 w-5 text-black" />
+                  </div>
+                  <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest group-hover:text-white/60">Total Orders</p>
+                  <p className="text-3xl font-black text-black group-hover:text-white">{selectedCustomer.totalOrders}</p>
+                </div>
+                <div className="bg-gray-50 rounded-[2rem] p-5 border border-gray-100 flex flex-col items-center justify-center text-center group hover:bg-black hover:border-black transition-all duration-500 shadow-sm">
+                  <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-md mb-3 group-hover:scale-110 group-hover:-rotate-6 transition-all">
+                    <TrendingUp className="h-5 w-5 text-black" />
+                  </div>
+                  <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest group-hover:text-white/60">Total Spent</p>
+                  <p className="text-2xl font-black text-black group-hover:text-white">฿{selectedCustomer.totalSpent.toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-50 rounded-[2rem] p-5 border border-gray-100 flex flex-col items-center justify-center text-center group hover:bg-black hover:border-black transition-all duration-500 shadow-sm col-span-2 md:col-span-1">
+                  <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-md mb-3 group-hover:scale-110 transition-all">
+                    <Calendar className="h-5 w-5 text-black" />
+                  </div>
+                  <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest group-hover:text-white/60">Joined Since</p>
+                  <p className="text-sm font-black text-black group-hover:text-white">{new Date(selectedCustomer.registeredDate).toLocaleDateString("th-TH")}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Details Section */}
+                <div className="space-y-6">
+                  <Card className="shadow-sm border-gray-100">
+                    <CardHeader className="pb-4 border-b border-gray-50"><CardTitle className="text-lg">Customer Info</CardTitle></CardHeader>
+                    <CardContent className="space-y-4 pt-4">
+                      <div><Label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Name</Label><p className="font-bold text-lg text-black">{selectedCustomer.name}</p></div>
+                      <div><Label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">LINE ID</Label><p className="font-mono text-sm bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block">{selectedCustomer.lineId}</p></div>
+                      <div><Label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Tax ID</Label><p className="font-mono text-sm bg-gray-50 p-2 rounded-lg border border-gray-100 inline-block ml-2">{selectedCustomer.taxId || "Not provided"}</p></div>
+                      <div><Label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Receipt Address</Label><p className="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 p-3 rounded-xl border border-gray-100">{selectedCustomer.receiptAddress || "No address provided"}</p></div>
+                      <div>
+                        <Label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Store Access</Label>
+                        <div className="space-y-2 mt-2">
+                          {selectedCustomer.storeAccess.map((s, i) => (
+                            <div key={i} className="flex justify-between items-center p-2 bg-gray-50 rounded-xl border border-gray-100 shadow-sm">
+                              <span className="text-xs font-black">{s.storeName}</span>
+                              <Badge className={`${tierInfo[s.tier].color} ${tierInfo[s.tier].bg} border-0 text-[10px] font-black uppercase h-6`}>
+                                {tierInfo[s.tier].emoji} {tierInfo[s.tier].name}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Custom Prices Section */}
+                <div className="space-y-6">
+                  <Card className="shadow-sm border-gray-100 border-black/10">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-gray-50">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Tag className="h-5 w-5" /> Special Pricing
+                      </CardTitle>
+                      <Dialog open={isCustomPriceDialogOpen} onOpenChange={setIsCustomPriceDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                            Configure Prices
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                          <DialogHeader><DialogTitle>Configure Custom Product Pricing</DialogTitle></DialogHeader>
+                          <CustomPriceForm
+                            products={products}
+                            currentPrices={selectedCustomer.customPrices || []}
+                            onSave={(prices) => {
+                              handleUpdateCustomPrices(prices);
+                              setIsCustomPriceDialogOpen(false);
+                            }}
+                            onCancel={() => setIsCustomPriceDialogOpen(false)}
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {selectedCustomer.customPrices && selectedCustomer.customPrices.length > 0 ? (
+                        <div className="space-y-3">
+                          {selectedCustomer.customPrices.map((cp, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex items-center justify-center">
+                                  <ImageWithFallback src={cp.imageUrl} alt={cp.productName} className="w-full h-full object-cover" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-black">{cp.productName}</p>
+                                  <p className="text-[9px] text-gray-400 font-mono tracking-tighter uppercase">{cp.sku}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-black text-blue-600">฿{cp.customPrice.toLocaleString()}</p>
+                                <p className="text-[9px] text-gray-400 line-through">฿{cp.originalPrice.toLocaleString()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 text-gray-300 italic text-sm">
+                          <Tag className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                          No special pricing rules
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Order History */}
+              <Card className="shadow-sm border-gray-100">
+                <CardHeader className="border-b border-gray-50 bg-gray-50/50">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <History className="h-5 w-5" /> Recent Orders
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" className="h-8 text-[10px] font-black uppercase text-gray-400 hover:text-black" onClick={() => fetchOrderHistory(selectedCustomer.id)}>
+                      Refresh
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {isLoadingHistory ? (
+                    <div className="py-12 text-center text-xs text-gray-400 font-black uppercase tracking-widest">Loading orders...</div>
+                  ) : orderHistory.length === 0 ? (
+                    <div className="py-12 text-center text-sm text-gray-300 italic">No orders found for this customer</div>
+                  ) : (
+                    <Table>
+                      <TableHeader><TableRow className="bg-gray-50/30">
+                        <TableHead className="py-3 text-[10px] font-black">Order ID</TableHead>
+                        <TableHead className="text-[10px] font-black">Date</TableHead>
+                        <TableHead className="text-[10px] font-black">Amount</TableHead>
+                        <TableHead className="text-center text-[10px] font-black">Status</TableHead>
+                        <TableHead className="text-right pr-6 text-[10px] font-black">Action</TableHead>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {orderHistory.map((order) => (
+                          <TableRow key={order.id} className="group hover:bg-gray-50/50 transition-colors">
+                            <TableCell className="font-mono text-[11px] font-bold">{order.id}</TableCell>
+                            <TableCell className="text-xs text-gray-500">{new Date(order.orderDate).toLocaleDateString("th-TH")}</TableCell>
+                            <TableCell className="font-black text-xs">฿{order.totalAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge className="text-[8px] font-black uppercase px-1.5 h-4 bg-gray-100 text-gray-600 border-0">{order.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-300 hover:text-black hover:bg-white group-hover:shadow-sm">
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="flex-1 shadow-sm border-dashed border-gray-200 bg-gray-50/30 flex flex-col items-center justify-center text-center p-12 hidden lg:flex">
+          <div className="w-24 h-24 rounded-[2rem] bg-white flex items-center justify-center shadow-xl shadow-black/5 mb-6 animate-pulse">
+            <Users className="h-10 w-10 text-gray-200" />
+          </div>
+          <h3 className="text-xl font-black text-gray-400 uppercase tracking-tight">No Customer Selected</h3>
+          <p className="text-gray-300 text-sm mt-2 max-w-[240px]">Select a customer from the left to view their profile, access levels, and order history.</p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sub-component: Custom Price Form
+// ─────────────────────────────────────────────────────────────
+function CustomPriceForm({
+  products,
+  currentPrices,
+  onSave,
+  onCancel,
+}: {
+  products: any[];
+  currentPrices: CustomProductPrice[];
+  onSave: (prices: CustomProductPrice[]) => void;
+  onCancel: () => void;
+}) {
+  const [selectedPrices, setSelectedPrices] = useState<CustomProductPrice[]>(currentPrices);
+  const [search, setSearch] = useState("");
+
+  const filteredProducts = products.filter(
+    (p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const addProduct = (p: any) => {
+    if (selectedPrices.find((sp) => sp.productId === p.id)) return;
+    setSelectedPrices([
+      ...selectedPrices,
+      {
+        productId: p.id,
+        productName: p.name,
+        sku: p.sku,
+        imageUrl: p.imageUrl,
+        originalPrice: p.tierPricing.bronze,
+        customPrice: p.tierPricing.bronze,
+      },
+    ]);
+  };
+
+  const removeProduct = (id: string) => {
+    setSelectedPrices(selectedPrices.filter((p) => p.productId !== id));
+  };
+
+  const updatePrice = (id: string, price: number) => {
+    setSelectedPrices(selectedPrices.map((p) => (p.productId === id ? { ...p, customPrice: price } : p)));
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Product Selector */}
+        <div className="space-y-4">
+          <Label className="font-bold text-xs uppercase text-gray-400">Add Products</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 h-10" />
+          </div>
+          <div className="h-[300px] overflow-y-auto border rounded-xl divide-y">
+            {filteredProducts.map((p) => {
+              const isSelected = selectedPrices.some(sp => sp.productId === p.id);
+              return (
+                <div key={p.id} className="p-3 flex items-center justify-between hover:bg-gray-50 group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded border overflow-hidden shrink-0"><ImageWithFallback src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" /></div>
+                    <div>
+                      <p className="text-xs font-bold truncate max-w-[140px]">{p.name}</p>
+                      <p className="text-[9px] text-gray-400 font-mono">{p.sku}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant={isSelected ? "ghost" : "outline"}
+                    size="sm"
+                    className={`h-8 w-8 p-0 rounded-full transition-all ${isSelected ? "text-green-500 opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    onClick={() => addProduct(p)}
+                    disabled={isSelected}
+                  >
+                    {isSelected ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  </Button>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" name="phone" defaultValue={customer?.phone} required />
-          </div>
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue={customer?.email} required />
-          </div>
-        </div>
-
-        {customer && (
-          <div>
-            <Label htmlFor="status">Status</Label>
-            <Select name="status" defaultValue={customer.status}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setIsAddDialogOpen(false);
-              setEditingCustomer(null);
-              setFormStoreAccess([]);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" className="bg-black text-white hover:bg-gray-800">
-            {customer ? "Update" : "Add"} Customer
-          </Button>
-        </div>
-      </form>
-    );
-  };
-
-  // ── Customer Detail View ──
-  if (selectedCustomer) {
-    return (
-      <div className="space-y-6">
-        <Button variant="outline" onClick={() => setSelectedCustomer(null)} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Customers
-        </Button>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column: Customer Info */}
-          <div className="lg:col-span-1 space-y-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground">Name</Label>
-                  <p className="font-semibold">{selectedCustomer.name}</p>
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground">Store Access & Tiers</Label>
-                  <div className="space-y-2 mt-2">
-                    {selectedCustomer.storeAccess.map((store, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <span className="text-sm">{store.storeName}</span>
-                        <Badge className={`${tierInfo[store.tier].bg} ${tierInfo[store.tier].color} border-0`}>
-                          <span className="mr-1">{tierInfo[store.tier].emoji}</span>
-                          {tierInfo[store.tier].name}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-muted-foreground">LINE ID</Label>
-                  <p className="font-semibold">{selectedCustomer.lineId}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Phone</Label>
-                  <p className="font-semibold">{selectedCustomer.phone}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Email</Label>
-                  <p className="font-semibold">{selectedCustomer.email}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Member Since</Label>
-                  <p className="font-semibold">
-                    {new Date(selectedCustomer.registeredDate).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Status</Label>
-                  <Badge
-                    variant="secondary"
-                    className={selectedCustomer.status === "active" ? "bg-black text-white" : "bg-gray-400 text-white"}
-                  >
-                    {selectedCustomer.status}
-                  </Badge>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <Button
-                    className="w-full bg-black text-white hover:bg-gray-800"
-                    onClick={() => navigate(`/product-catalog/${selectedCustomer.id}`)}
-                  >
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    View Product Catalog
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ★ Customize Product Price Box */}
-            <CustomizePriceBox
-              customer={selectedCustomer}
-              onUpdate={handleUpdateCustomer}
-            />
-          </div>
-
-          {/* Right column: Stats, Orders, Products */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-black/5 rounded-lg">
-                      <ShoppingCart className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Orders</p>
-                      <p className="text-2xl font-bold">{selectedCustomer.totalOrders}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-black/5 rounded-lg">
-                      <TrendingUp className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Spent</p>
-                      <p className="text-2xl font-bold">
-                        ฿{selectedCustomer.totalSpent.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Orders</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {selectedCustomer.recentOrders?.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+        {/* Selected List */}
+        <div className="space-y-4">
+          <Label className="font-bold text-xs uppercase text-gray-400">Price Configuration</Label>
+          <div className="h-[350px] overflow-y-auto border rounded-xl divide-y bg-gray-50/50">
+            {selectedPrices.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center text-gray-300">
+                <Tag className="h-8 w-8 mb-2 opacity-20" />
+                <p className="text-xs italic">No items selected for special pricing</p>
+              </div>
+            ) : (
+              selectedPrices.map((p) => (
+                <div key={p.productId} className="p-4 bg-white space-y-3 shadow-sm first:rounded-t-xl last:rounded-b-xl">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded border overflow-hidden"><ImageWithFallback src={p.imageUrl} alt={p.productName} className="w-full h-full object-cover" /></div>
                       <div>
-                        <p className="font-semibold">{order.id}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(order.date).toLocaleDateString()}
-                        </p>
-                        <p className="text-sm mt-1">{order.products.join(", ")}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">฿{order.amount.toLocaleString()}</p>
-                        <Badge variant="outline">{order.status}</Badge>
+                        <p className="text-[11px] font-bold leading-tight">{p.productName}</p>
+                        <p className="text-[9px] text-gray-400">Original: ฿{p.originalPrice.toLocaleString()}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Most Ordered Products</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {selectedCustomer.topProducts?.map((product, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-semibold">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">Ordered {product.times} times</p>
-                      </div>
-                      <Badge variant="secondary">{product.quantity} units</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Customer List View ──
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Customer Management
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Manage customers and their store access
-              </p>
-            </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-black text-white hover:bg-gray-800">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add Customer
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Add New Customer</DialogTitle>
-                </DialogHeader>
-                <CustomerForm />
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tier Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Object.entries(tierInfo).map(([tier, info]) => {
-          const count = customers.reduce(
-            (sum, c) => sum + c.storeAccess.filter((s) => s.tier === tier).length,
-            0
-          );
-          return (
-            <Card key={tier}>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{info.emoji}</span>
-                    <div>
-                      <p className="text-sm text-muted-foreground">{info.name}</p>
-                      <p className="text-2xl font-bold">{count}</p>
-                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-300 hover:text-red-500" onClick={() => removeProduct(p.productId)}><X className="h-4 w-4" /></Button>
                   </div>
-                  <Award className="h-8 w-8 text-muted-foreground/20" />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Customers Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer Info</TableHead>
-                <TableHead>Store Access</TableHead>
-                <TableHead>LINE ID</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Total Spent</TableHead>
-                <TableHead>Custom Prices</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers.map((customer) => (
-                <TableRow
-                  key={customer.id}
-                  className="cursor-pointer hover:bg-gray-50"
-                  onClick={() => setSelectedCustomer(customer)}
-                >
-                  <TableCell>
-                    <div>
-                      <div className="font-semibold">{customer.name}</div>
-                      <div className="text-sm text-muted-foreground">{customer.id}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">฿</span>
+                      <Input type="number" value={p.customPrice} onChange={(e) => updatePrice(p.productId, Number(e.target.value))} className="h-9 pl-7 font-black text-sm border-blue-100 focus:border-blue-500 focus:ring-blue-500" />
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      {customer.storeAccess.map((store, index) => (
-                        <Badge
-                          key={index}
-                          className={`${tierInfo[store.tier].bg} ${tierInfo[store.tier].color} border-0 mr-1`}
-                        >
-                          <span className="mr-1">{tierInfo[store.tier].emoji}</span>
-                          {store.storeName.replace("Store Account ", "S")}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm font-semibold">{customer.lineId}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm">{customer.phone}</div>
-                      <div className="text-xs text-muted-foreground">{customer.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{customer.totalOrders}</TableCell>
-                  <TableCell>฿{customer.totalSpent.toLocaleString()}</TableCell>
-                  <TableCell>
-                    {(customer.customPrices?.length ?? 0) > 0 ? (
-                      <Badge className="bg-purple-100 text-purple-700 border-0">
-                        <Tag className="h-3 w-3 mr-1" />
-                        {customer.customPrices!.length} items
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={customer.status === "active" ? "bg-black text-white" : "bg-gray-400 text-white"}
-                    >
-                      {customer.status}
+                    <Badge variant="outline" className="h-9 px-3 text-[10px] font-black text-blue-600 bg-blue-50 border-blue-100">
+                      -{Math.round(((p.originalPrice - p.customPrice) / p.originalPrice) * 100)}%
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/product-catalog/${customer.id}`);
-                        }}
-                        title="View Product Catalog"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                      <Dialog
-                        open={editingCustomer?.id === customer.id}
-                        onOpenChange={(open) => {
-                          if (!open) {
-                            setEditingCustomer(null);
-                            setFormStoreAccess([]);
-                          }
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingCustomer(customer);
-                              setFormStoreAccess(customer.storeAccess);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Edit Customer</DialogTitle>
-                          </DialogHeader>
-                          <CustomerForm customer={customer} />
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCustomer(customer.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSave(selectedPrices)} className="bg-black text-white hover:bg-gray-800 px-8 font-black">Save All Rules</Button>
+      </div>
     </div>
   );
 }
