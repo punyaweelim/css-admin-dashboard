@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Package, Search, Filter, Eye, Edit, Trash2, Plus, X, Calendar, User, Store, Hash, CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Tag } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Package, Search, Filter, Eye, Edit, Trash2, Plus, X, Calendar, User, Store, Hash, CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Tag, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Input } from "@/app/components/ui/input";
 import { Button } from "@/app/components/ui/button";
@@ -25,11 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/app/components/ui/dialog";
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
-import { Separator } from "@/app/components/ui/separator";
+import { Checkbox } from "@/app/components/ui/checkbox";
 import { ImageWithFallback } from "@/app/components/figma/ImageWithFallback";
+import { api } from "@/app/utils/api";
+import { toast } from "sonner";
 
 interface OrderItem {
   productId: string;
@@ -44,9 +47,11 @@ interface OrderItem {
 
 interface Order {
   id: string;
+  customerId: string;
   customerName: string;
   lineId: string;
   lineAccount: string;
+  storeId: string;
   products: string[];
   items: OrderItem[];
   quantity: number;
@@ -60,6 +65,7 @@ interface Customer {
   id: string;
   name: string;
   lineId: string;
+  defaultWithTax?: boolean;
 }
 
 interface Product {
@@ -67,181 +73,12 @@ interface Product {
   name: string;
   price: number;
   stock: number;
+  tierPricing: any;
+  storeId: string;
+  imageUrl?: string;
+  sku: string;
+  category: string;
 }
-
-const mockCustomers: Customer[] = [
-  { id: "CUST-001", name: "สมชาย ใจดี", lineId: "LINE-123456" },
-  { id: "CUST-002", name: "สมหญิง รักสวย", lineId: "LINE-789012" },
-  { id: "CUST-003", name: "วิชัย ประเสริฐ", lineId: "LINE-345678" },
-  { id: "CUST-004", name: "นภา สุขใจ", lineId: "LINE-901234" },
-];
-
-const mockProducts: Product[] = [
-  { id: "PROD-001", name: "Product A", price: 300, stock: 500 },
-  { id: "PROD-002", name: "Product B", price: 150, stock: 200 },
-  { id: "PROD-003", name: "Product C", price: 400, stock: 50 },
-  { id: "PROD-004", name: "Product D", price: 250, stock: 100 },
-];
-
-const mockOrders: Order[] = [
-  {
-    id: "ORD-001",
-    customerName: "สมชาย ใจดี",
-    lineId: "LINE-123456",
-    lineAccount: "Store Account 1",
-    products: ["Product A", "Product B"],
-    items: [
-      {
-        productId: "PROD-001",
-        productName: "Product A - Premium Electronics",
-        sku: "SKU-A001",
-        category: "Electronics",
-        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
-        quantity: 100,
-        unitPrice: 300,
-        subtotal: 30000,
-      },
-      {
-        productId: "PROD-002",
-        productName: "Product B - Home & Garden",
-        sku: "SKU-B002",
-        category: "Home & Garden",
-        imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
-        quantity: 50,
-        unitPrice: 150,
-        subtotal: 7500,
-      },
-    ],
-    quantity: 150,
-    totalAmount: 37500,
-    status: "pending",
-    orderDate: "2026-01-20",
-    notes: "กรุณาจัดส่งในเวลาราชการ",
-  },
-  {
-    id: "ORD-002",
-    customerName: "สมหญิง รักสวย",
-    lineId: "LINE-789012",
-    lineAccount: "Store Account 2",
-    products: ["Product C"],
-    items: [
-      {
-        productId: "PROD-003",
-        productName: "Product C - Fashion Accessories",
-        sku: "SKU-C003",
-        category: "Fashion",
-        imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
-        quantity: 200,
-        unitPrice: 400,
-        subtotal: 80000,
-      },
-    ],
-    quantity: 200,
-    totalAmount: 80000,
-    status: "processing",
-    orderDate: "2026-01-19",
-  },
-  {
-    id: "ORD-003",
-    customerName: "วิชัย ประเสริฐ",
-    lineId: "LINE-345678",
-    lineAccount: "Store Account 3",
-    products: ["Product A", "Product D"],
-    items: [
-      {
-        productId: "PROD-001",
-        productName: "Product A - Premium Electronics",
-        sku: "SKU-A001",
-        category: "Electronics",
-        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
-        quantity: 50,
-        unitPrice: 300,
-        subtotal: 15000,
-      },
-      {
-        productId: "PROD-004",
-        productName: "Product D - Beauty Products",
-        sku: "SKU-D004",
-        category: "Beauty",
-        imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
-        quantity: 50,
-        unitPrice: 250,
-        subtotal: 12500,
-      },
-    ],
-    quantity: 100,
-    totalAmount: 27500,
-    status: "completed",
-    orderDate: "2026-01-18",
-  },
-  {
-    id: "ORD-004",
-    customerName: "นภา สุขใจ",
-    lineId: "LINE-901234",
-    lineAccount: "Store Account 1",
-    products: ["Product B", "Product C", "Product D"],
-    items: [
-      {
-        productId: "PROD-002",
-        productName: "Product B - Home & Garden",
-        sku: "SKU-B002",
-        category: "Home & Garden",
-        imageUrl: "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=400",
-        quantity: 100,
-        unitPrice: 150,
-        subtotal: 15000,
-      },
-      {
-        productId: "PROD-003",
-        productName: "Product C - Fashion Accessories",
-        sku: "SKU-C003",
-        category: "Fashion",
-        imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400",
-        quantity: 100,
-        unitPrice: 400,
-        subtotal: 40000,
-      },
-      {
-        productId: "PROD-004",
-        productName: "Product D - Beauty Products",
-        sku: "SKU-D004",
-        category: "Beauty",
-        imageUrl: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=400",
-        quantity: 100,
-        unitPrice: 250,
-        subtotal: 25000,
-      },
-    ],
-    quantity: 300,
-    totalAmount: 80000,
-    status: "processing",
-    orderDate: "2026-01-17",
-    notes: "แพ็คแยกตามประเภทสินค้า",
-  },
-  {
-    id: "ORD-005",
-    customerName: "ธนา มั่งมี",
-    lineId: "LINE-567890",
-    lineAccount: "Store Account 2",
-    products: ["Product A"],
-    items: [
-      {
-        productId: "PROD-001",
-        productName: "Product A - Premium Electronics",
-        sku: "SKU-A001",
-        category: "Electronics",
-        imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400",
-        quantity: 50,
-        unitPrice: 300,
-        subtotal: 15000,
-      },
-    ],
-    quantity: 50,
-    totalAmount: 15000,
-    status: "cancelled",
-    orderDate: "2026-01-16",
-  },
-];
 
 const statusConfig = {
   pending: {
@@ -270,6 +107,8 @@ const statusConfig = {
   },
 };
 
+const ITEMS_PER_PAGE = 10;
+
 function OrderStatusTimeline({ status }: { status: Order["status"] }) {
   if (status === "cancelled") {
     return (
@@ -286,7 +125,7 @@ function OrderStatusTimeline({ status }: { status: Order["status"] }) {
     { key: "completed", label: "เสร็จสิ้น", icon: CheckCircle2 },
   ];
 
-  const currentStep = statusConfig[status].step;
+  const currentStep = statusConfig[status]?.step || 1;
 
   return (
     <div className="flex items-center gap-0">
@@ -322,19 +161,275 @@ function OrderStatusTimeline({ status }: { status: Order["status"] }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Sub-component: Order Form (Shared for Create/Edit)
+// ─────────────────────────────────────────────────────────────
+interface OrderFormProps {
+  order?: Order;
+  customers: Customer[];
+  products: Product[];
+  onSubmit: (data: any) => void;
+  onCancel: () => void;
+}
+
+function OrderForm({ order, customers, products, onSubmit, onCancel }: OrderFormProps) {
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(order?.customerId || "");
+  const [selectedAccount, setSelectedAccount] = useState<string>(order?.lineAccount || "");
+  const [selectedProducts, setSelectedProducts] = useState<{productId: string, quantity: number}[]>(
+    order?.items?.filter(i => (i.unitPrice || 0) > 0).map(i => ({ productId: i.productId, quantity: i.quantity })) || []
+  );
+  const [orderNotes, setOrderNotes] = useState(order?.notes || "");
+  const [orderStatus, setOrderStatus] = useState<string>(order?.status || "pending");
+  const [withTax, setWithTax] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (selectedCustomer && orderStatus === "processing" && order?.status === "pending") {
+      const customer = customers.find(c => c.id === selectedCustomer);
+      if (customer) {
+        setWithTax(!!customer.defaultWithTax);
+      }
+    }
+  }, [selectedCustomer, orderStatus, customers, order?.status]);
+
+  const selectedStoreProducts = useMemo(() => {
+    if (!selectedAccount) return [];
+    const storeId = selectedAccount === "Store 3A" ? "3a" : selectedAccount === "Store Tong 3" ? "tong3" : "4thit";
+    return products.filter((p: any) => p.storeId === storeId);
+  }, [selectedAccount, products]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer || !selectedAccount || selectedProducts.length === 0) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    const storeId = selectedAccount === "Store 3A" ? "3a" : selectedAccount === "Store Tong 3" ? "tong3" : "4thit";
+    
+    onSubmit({
+      customerId: selectedCustomer,
+      storeId: storeId,
+      status: orderStatus,
+      withTax: withTax,
+      items: selectedProducts.filter(sp => sp.productId).map(sp => ({
+        productId: sp.productId,
+        quantity: sp.quantity
+      })),
+      notes: orderNotes
+    });
+  };
+
+  const addProductRow = () => {
+    setSelectedProducts([...selectedProducts, { productId: "", quantity: 1 }]);
+  };
+
+  const removeProductRow = (index: number) => {
+    setSelectedProducts(selectedProducts.filter((_, i) => i !== index));
+  };
+
+  const updateProductRow = (index: number, productId: string, quantity: number) => {
+    const updated = [...selectedProducts];
+    updated[index] = { productId, quantity };
+    setSelectedProducts(updated);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Customer *</Label>
+          <Select value={selectedCustomer} onValueChange={setSelectedCustomer} disabled={!!order}>
+            <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+            <SelectContent>
+              {customers.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name} ({c.lineId})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Store Account *</Label>
+          <Select value={selectedAccount} onValueChange={setSelectedAccount} disabled={!!order}>
+            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Store 3A">Store 3A</SelectItem>
+              <SelectItem value="Store Tong 3">Store Tong 3</SelectItem>
+              <SelectItem value="Store 4Thit">Store 4Thit</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {order && (
+        <div className="space-y-4">
+          <div>
+            <Label>Order Status</Label>
+            <Select value={orderStatus} onValueChange={setOrderStatus}>
+              <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {orderStatus === "processing" && order.status === "pending" && (
+            <div className="flex items-center space-x-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
+              <Checkbox id="withTax" checked={withTax} onCheckedChange={(checked) => setWithTax(!!checked)} />
+              <div className="grid gap-1.5 leading-none">
+                <label htmlFor="withTax" className="text-sm font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-blue-900">
+                  Calculate VAT (7%) for this order
+                </label>
+                <p className="text-[10px] text-blue-600 font-medium italic">
+                  * A billing invoice will be created once you click update.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <Label className="flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4" />
+            Products *
+          </Label>
+          <Button type="button" variant="outline" size="sm" onClick={addProductRow} className="h-8">
+            <Plus className="h-3 w-3 mr-1" /> Add Product
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {selectedProducts.length === 0 ? (
+            <div className="text-center py-10 border border-dashed border-border rounded-2xl bg-gray-50/50">
+              <ShoppingBag className="h-10 w-10 text-gray-200 mx-auto mb-2" />
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest">No products in this order</p>
+            </div>
+          ) : (
+            selectedProducts.map((item, index) => {
+              const currentProduct = selectedStoreProducts.find(p => p.id === item.productId);
+              return (
+                <div key={index} className="flex gap-3 items-center p-3 border border-border rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                  {/* Product Selector with Image */}
+                  <div className="flex-1 min-w-0">
+                    <Select value={item.productId} onValueChange={(v) => updateProductRow(index, v, item.quantity)}>
+                      <SelectTrigger className="h-14 py-1 px-3">
+                        {currentProduct ? (
+                          <div className="flex items-center gap-3 text-left">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 border border-gray-100 shrink-0">
+                              <ImageWithFallback src={currentProduct.imageUrl} alt={currentProduct.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-sm truncate">{currentProduct.name}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">{currentProduct.sku} · ฿{currentProduct.tierPricing?.bronze?.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <SelectValue placeholder="Choose product..." />
+                        )}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedStoreProducts.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <div className="flex items-center gap-3 py-1">
+                              <div className="w-8 h-8 rounded border border-gray-100 overflow-hidden shrink-0">
+                                <ImageWithFallback src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-semibold text-xs truncate">{p.name}</span>
+                                <span className="text-[9px] text-gray-400">฿{p.tierPricing?.bronze?.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Quantity Input */}
+                  <div className="w-24 shrink-0">
+                    <Label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block px-1">Qty</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      className="h-10 text-center font-bold"
+                      value={item.quantity}
+                      onChange={(e) => updateProductRow(index, item.productId, parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+
+                  {/* Row Delete */}
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeProductRow(index)} className="h-10 w-10 text-gray-300 hover:text-red-500 hover:bg-red-50 mt-5">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div>
+        <Label className="flex items-center gap-2 mb-2">
+          <Tag className="h-4 w-4" />
+          Order Notes
+        </Label>
+        <Textarea
+          placeholder="Shipping instructions, package details, etc..."
+          value={orderNotes}
+          onChange={(e) => setOrderNotes(e.target.value)}
+          className="rounded-2xl border-gray-200"
+          rows={3}
+        />
+      </div>
+
+      <DialogFooter className="bg-gray-50 -mx-6 -mb-6 p-6 mt-6 border-t border-gray-100">
+        <Button type="button" variant="outline" onClick={onCancel} className="rounded-xl">Cancel</Button>
+        <Button type="submit" className="bg-black text-white hover:bg-gray-800 rounded-xl px-8 font-bold">
+          {order ? "Update Order" : "Submit Order"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 export function OrderManagement() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterAccount, setFilterAccount] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Create Order Form States
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
-  const [selectedAccount, setSelectedAccount] = useState<string>("");
-  const [selectedProducts, setSelectedProducts] = useState<{productId: string, quantity: number}[]>([]);
-  const [orderNotes, setOrderNotes] = useState("");
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [ordersRes, customersRes, productsRes] = await Promise.all([
+        api.get<any>("/orders?limit=1000"),
+        api.get<any>("/customers?limit=1000"),
+        api.get<any>("/products?limit=1000"),
+      ]);
+      setOrders(ordersRes.data || []);
+      setCustomers(customersRes.data || []);
+      setProducts(productsRes.data || []);
+    } catch (err) {
+      toast.error("Failed to fetch data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -346,6 +441,12 @@ export function OrderManagement() {
     return matchesSearch && matchesStatus && matchesAccount;
   });
 
+  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case "pending": return "bg-amber-100 text-amber-800 border border-amber-200";
@@ -356,6 +457,41 @@ export function OrderManagement() {
     }
   };
 
+  const handleCreateOrder = async (data: any) => {
+    try {
+      await api.post("/orders", data);
+      toast.success("Order created successfully (Pending review)");
+      setIsCreateDialogOpen(false);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create order");
+    }
+  };
+
+  const handleUpdateOrder = async (data: any) => {
+    if (!editingOrder) return;
+    try {
+      await api.put(`/orders/${editingOrder.id}`, data);
+      toast.success(data.status === "processing" ? "Order processing and Bill created" : "Order updated successfully");
+      setEditingOrder(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update order");
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deletingOrderId) return;
+    try {
+      await api.delete(`/orders/${deletingOrderId}`);
+      toast.success("Order deleted and stock returned");
+      setDeletingOrderId(null);
+      fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete order");
+    }
+  };
+
   const stats = {
     total: orders.length,
     pending: orders.filter((o) => o.status === "pending").length,
@@ -363,509 +499,197 @@ export function OrderManagement() {
     completed: orders.filter((o) => o.status === "completed").length,
   };
 
-  const handleCreateOrder = () => {
-    if (!selectedCustomer || !selectedAccount || selectedProducts.length === 0) {
-      alert("Please fill in all required fields");
-      return;
-    }
-
-    const customer = mockCustomers.find(c => c.id === selectedCustomer);
-    if (!customer) return;
-
-    const items: OrderItem[] = selectedProducts
-      .filter(sp => sp.productId)
-      .map(sp => {
-        const product = mockProducts.find(p => p.id === sp.productId);
-        return {
-          productId: sp.productId,
-          productName: product?.name || "",
-          sku: `SKU-${sp.productId}`,
-          category: "General",
-          imageUrl: "",
-          quantity: sp.quantity,
-          unitPrice: product?.price || 0,
-          subtotal: (product?.price || 0) * sp.quantity,
-        };
-      });
-
-    const productNames = items.map(i => i.productName).filter(Boolean);
-    const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0);
-    const totalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const newOrder: Order = {
-      id: `ORD-${String(orders.length + 1).padStart(3, "0")}`,
-      customerName: customer.name,
-      lineId: customer.lineId,
-      lineAccount: selectedAccount,
-      products: productNames,
-      items,
-      quantity: totalQuantity,
-      totalAmount,
-      status: "pending",
-      orderDate: new Date().toISOString().split("T")[0],
-      notes: orderNotes || undefined,
-    };
-
-    setOrders([newOrder, ...orders]);
-    setSelectedCustomer("");
-    setSelectedAccount("");
-    setSelectedProducts([]);
-    setOrderNotes("");
-    setIsCreateDialogOpen(false);
-  };
-
-  const addProduct = () => {
-    setSelectedProducts([...selectedProducts, { productId: "", quantity: 1 }]);
-  };
-
-  const removeProduct = (index: number) => {
-    setSelectedProducts(selectedProducts.filter((_, i) => i !== index));
-  };
-
-  const updateProduct = (index: number, productId: string, quantity: number) => {
-    const updated = [...selectedProducts];
-    updated[index] = { productId, quantity };
-    setSelectedProducts(updated);
-  };
-
-  const calculateTotal = () => {
-    return selectedProducts.reduce((sum, sp) => {
-      const product = mockProducts.find(p => p.id === sp.productId);
-      return sum + (product?.price || 0) * sp.quantity;
-    }, 0);
-  };
-
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Processing</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-          </CardContent>
-        </Card>
+        <Card className="shadow-sm border-gray-100"><CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Total Orders</CardTitle></CardHeader><CardContent><div className="text-3xl font-black">{stats.total}</div></CardContent></Card>
+        <Card className="shadow-sm border-gray-100"><CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Pending</CardTitle></CardHeader><CardContent><div className="text-3xl font-black text-amber-600">{stats.pending}</div></CardContent></Card>
+        <Card className="shadow-sm border-gray-100"><CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Processing</CardTitle></CardHeader><CardContent><div className="text-3xl font-black text-blue-600">{stats.processing}</div></CardContent></Card>
+        <Card className="shadow-sm border-gray-100"><CardHeader className="pb-2"><CardTitle className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Completed</CardTitle></CardHeader><CardContent><div className="text-3xl font-black text-green-600">{stats.completed}</div></CardContent></Card>
       </div>
 
       {/* Orders Table */}
-      <Card>
+      <Card className="shadow-sm border-gray-100">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Order Management
-            </CardTitle>
+            <div>
+              <CardTitle className="text-2xl font-black flex items-center gap-2">Order Management</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1 tracking-tight">Track, manage and edit bulk customer orders across all stores.</p>
+            </div>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-black text-white hover:bg-gray-800">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Order
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button className="bg-black text-white hover:bg-gray-800 shadow-lg shadow-black/20 rounded-xl px-6"><Plus className="h-4 w-4 mr-2" />Create Order</Button></DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create New Order</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="customer">Customer *</Label>
-                      <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select customer" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mockCustomers.map((customer) => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name} ({customer.lineId})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="account">Store Account *</Label>
-                      <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Store Account 1">Store Account 1</SelectItem>
-                          <SelectItem value="Store Account 2">Store Account 2</SelectItem>
-                          <SelectItem value="Store Account 3">Store Account 3</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <Label>Products *</Label>
-                      <Button type="button" variant="outline" size="sm" onClick={addProduct}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Product
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      {selectedProducts.length === 0 ? (
-                        <div className="text-center py-8 border border-dashed border-border rounded-lg">
-                          <p className="text-muted-foreground text-sm">No products added yet. Click "Add Product" to begin.</p>
-                        </div>
-                      ) : (
-                        selectedProducts.map((item, index) => (
-                          <div key={index} className="flex gap-3 items-start p-4 border border-border rounded-lg">
-                            <div className="flex-1 grid grid-cols-2 gap-3">
-                              <div>
-                                <Label className="text-xs">Product</Label>
-                                <Select value={item.productId} onValueChange={(value) => updateProduct(index, value, item.quantity)}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select product" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {mockProducts.map((product) => (
-                                      <SelectItem key={product.id} value={product.id}>
-                                        {product.name} - ฿{product.price} (Stock: {product.stock})
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label className="text-xs">Quantity</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => updateProduct(index, item.productId, parseInt(e.target.value) || 1)}
-                                />
-                              </div>
-                            </div>
-                            {item.productId && (
-                              <div className="text-right pt-6">
-                                <p className="text-sm font-semibold">
-                                  ฿{((mockProducts.find(p => p.id === item.productId)?.price || 0) * item.quantity).toLocaleString()}
-                                </p>
-                              </div>
-                            )}
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeProduct(index)} className="mt-6">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="notes">Order Notes (Optional)</Label>
-                    <Textarea
-                      id="notes"
-                      placeholder="Add any special instructions or notes..."
-                      value={orderNotes}
-                      onChange={(e) => setOrderNotes(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  {selectedProducts.length > 0 && (
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-semibold">Total Amount:</span>
-                        <span className="text-2xl font-bold">฿{calculateTotal().toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-3 border-t pt-4">
-                    <Button type="button" variant="outline" onClick={() => { setIsCreateDialogOpen(false); setSelectedCustomer(""); setSelectedAccount(""); setSelectedProducts([]); setOrderNotes(""); }}>
-                      Cancel
-                    </Button>
-                    <Button type="button" className="bg-black text-white hover:bg-gray-800" onClick={handleCreateOrder}>
-                      Create Order
-                    </Button>
-                  </div>
-                </div>
+                <DialogHeader><DialogTitle className="text-xl font-bold">Create New Order</DialogTitle></DialogHeader>
+                <OrderForm 
+                  customers={customers} 
+                  products={products} 
+                  onCancel={() => setIsCreateDialogOpen(false)} 
+                  onSubmit={handleCreateOrder} 
+                />
               </DialogContent>
             </Dialog>
           </div>
-          <div className="flex flex-col md:flex-row gap-4 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders, customer, LINE ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterAccount} onValueChange={setFilterAccount}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Account" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Accounts</SelectItem>
-                <SelectItem value="Store Account 1">Store Account 1</SelectItem>
-                <SelectItem value="Store Account 2">Store Account 2</SelectItem>
-                <SelectItem value="Store Account 3">Store Account 3</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col md:flex-row gap-4 mt-6">
+            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search orders, customer, LINE ID..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="pl-10 h-12 bg-gray-50 border-gray-100 rounded-xl shadow-inner" /></div>
+            <Select value={filterStatus} onValueChange={(v) => { setFilterStatus(v); setCurrentPage(1); }}><SelectTrigger className="w-full md:w-[180px] h-12 rounded-xl border-gray-100"><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="Status" /></SelectTrigger><SelectContent className="bg-white text-black"><SelectItem value="all">All Status</SelectItem><SelectItem value="pending">Pending</SelectItem><SelectItem value="processing">Processing</SelectItem><SelectItem value="completed">Completed</SelectItem><SelectItem value="cancelled">Cancelled</SelectItem></SelectContent></Select>
           </div>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>LINE ID</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Total Qty</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-mono">{order.id}</TableCell>
-                  <TableCell>{order.customerName}</TableCell>
-                  <TableCell className="font-mono text-sm">{order.lineId}</TableCell>
-                  <TableCell>{order.lineAccount}</TableCell>
-                  <TableCell>
-                    <div className="flex -space-x-2">
-                      {order.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0">
-                          <ImageWithFallback src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                      {order.items.length > 3 && (
-                        <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600 shrink-0">
-                          +{order.items.length - 3}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{order.items.length} ประเภท</p>
-                  </TableCell>
-                  <TableCell>{order.quantity.toLocaleString()} ชิ้น</TableCell>
-                  <TableCell className="font-semibold">฿{order.totalAmount.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge className={`${getStatusBadgeClass(order.status)} text-xs`} variant="secondary">
-                      {statusConfig[order.status].label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{new Date(order.orderDate).toLocaleDateString("th-TH")}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      {/* ORDER DETAILS MODAL */}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-                          {selectedOrder && (
-                            <>
-                              {/* Header Banner */}
-                              <div className="bg-black text-white px-6 pt-6 pb-5 rounded-t-lg">
-                                <div className="flex items-start justify-between mb-4">
-                                  <div>
-                                    <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Order Details</p>
-                                    <h2 className="text-2xl font-bold font-mono">{selectedOrder.id}</h2>
-                                  </div>
-                                  <Badge className={`${getStatusBadgeClass(selectedOrder.status)} mt-1`} variant="secondary">
-                                    {statusConfig[selectedOrder.status].label}
-                                  </Badge>
-                                </div>
+        <CardContent className="p-0 border-t border-gray-50">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-black" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Fetching Orders...</p>
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader className="bg-gray-50/50">
+                  <TableRow>
+                    <TableHead className="font-bold py-4">Order ID</TableHead>
+                    <TableHead className="font-bold">Customer</TableHead>
+                    <TableHead className="font-bold">Account</TableHead>
+                    <TableHead className="font-bold">Products</TableHead>
+                    <TableHead className="font-bold">Amount</TableHead>
+                    <TableHead className="font-bold">Status</TableHead>
+                    <TableHead className="font-bold">Date</TableHead>
+                    <TableHead className="text-right font-bold pr-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedOrders.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-24 text-gray-400 italic">No orders found</TableCell></TableRow>
+                  ) : (
+                    paginatedOrders.map((order) => (
+                      <TableRow key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                        <TableCell className="font-mono font-bold text-black">{order.id}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-black">{order.customerName}</span>
+                            <span className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{order.lineId}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell><div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-green-500 rounded-full" /><span className="text-xs font-medium">{order.lineAccount}</span></div></TableCell>
+                        <TableCell>
+                          <div className="flex -space-x-2">
+                            {order.items?.slice(0, 3).map((item, idx) => (
+                              <div key={idx} className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-gray-100 shrink-0"><ImageWithFallback src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover" /></div>
+                            ))}
+                            {(order.items?.length || 0) > 3 && <div className="w-8 h-8 rounded-full border-2 border-white bg-black flex items-center justify-center text-[10px] font-bold text-white shrink-0">+{order.items.length - 3}</div>}
+                          </div>
+                        </TableCell>
+                        <TableCell><span className="font-black text-black">฿{(order.totalAmount || 0).toLocaleString()}</span></TableCell>
+                        <TableCell><Badge className={`${getStatusBadgeClass(order.status)} text-[9px] font-black uppercase py-0.5 px-2 h-5`} variant="secondary">{statusConfig[order.status]?.label}</Badge></TableCell>
+                        <TableCell className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{new Date(order.orderDate).toLocaleDateString("th-TH", { day: '2-digit', month: 'short' })}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <div className="flex justify-end gap-1">
+                            <Dialog>
+                              <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-black hover:bg-gray-100" onClick={() => setSelectedOrder(order)}><Eye className="h-4 w-4" /></Button></DialogTrigger>
+                              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">{selectedOrder && (
+                                <><div className="bg-black text-white px-6 pt-6 pb-5 rounded-t-lg shadow-xl shadow-black/10"><div className="flex items-start justify-between mb-4"><div><p className="text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-60">Order Record</p><h2 className="text-2xl font-black font-mono">{selectedOrder.id}</h2></div><Badge className={`${getStatusBadgeClass(selectedOrder.status)} mt-1 border-0 h-6 px-3 font-black text-[10px] uppercase`} variant="secondary">{statusConfig[selectedOrder.status]?.label}</Badge></div><OrderStatusTimeline status={selectedOrder.status} /></div>
+                                <div className="p-6 space-y-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div className="bg-gray-50 rounded-2xl p-3 border border-gray-100"><div className="flex items-center gap-1.5 mb-1"><User className="h-3.5 w-3.5 text-gray-400" /><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">ลูกค้า</span></div><p className="font-bold text-sm text-black truncate">{selectedOrder.customerName}</p></div><div className="bg-gray-50 rounded-2xl p-3 border border-gray-100"><div className="flex items-center gap-1.5 mb-1"><Hash className="h-3.5 w-3.5 text-gray-400" /><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">LINE ID</span></div><p className="font-bold text-xs font-mono text-black">{selectedOrder.lineId}</p></div><div className="bg-gray-50 rounded-2xl p-3 border border-gray-100"><div className="flex items-center gap-1.5 mb-1"><Store className="h-3.5 w-3.5 text-gray-400" /><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Store</span></div><p className="font-bold text-sm text-black truncate">{selectedOrder.lineAccount}</p></div><div className="bg-gray-50 rounded-2xl p-3 border border-gray-100"><div className="flex items-center gap-1.5 mb-1"><Calendar className="h-3.5 w-3.5 text-gray-400" /><span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">วันที่สั่ง</span></div><p className="font-bold text-sm text-black">{new Date(selectedOrder.orderDate).toLocaleDateString("th-TH")}</p></div></div>
+                                <div><div className="flex items-center gap-2 mb-4"><ShoppingBag className="h-4 w-4 text-black" /><h3 className="font-black text-sm uppercase tracking-wider">รายการสินค้า ({selectedOrder.items?.length || 0})</h3></div><div className="space-y-3">{selectedOrder.items?.map((item, idx) => (<div key={idx} className="flex gap-4 items-center p-4 border border-gray-100 rounded-2xl bg-white hover:border-black/10 transition-colors shadow-sm"><div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100"><ImageWithFallback src={item.imageUrl} alt={item.productName} className="w-full h-full object-cover" /></div><div className="flex-1 min-w-0"><p className="font-bold text-sm truncate text-black">{item.productName}</p><div className="flex items-center gap-2 mt-1"><span className="text-[10px] text-gray-400 font-mono tracking-tighter uppercase">{item.sku}</span><Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 py-0 rounded-sm">{item.category}</Badge></div><p className="text-[10px] font-bold text-gray-500 mt-1">฿{(item.unitPrice || 0).toLocaleString()} × {(item.quantity || 0).toLocaleString()} ชิ้น</p></div><div className="text-right shrink-0"><p className="font-black text-sm text-black">฿{(item.subtotal || 0).toLocaleString()}</p><p className="text-[9px] uppercase font-bold text-gray-300">Total</p></div></div>))}</div></div>
+                                <div className="bg-black rounded-2xl p-5 flex justify-between items-center text-white shadow-lg"><div className="flex flex-col"><span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Total Quantity</span><span className="text-lg font-black">{(selectedOrder.quantity || 0).toLocaleString()} <span className="text-xs font-medium text-gray-400 uppercase tracking-widest ml-1">Items</span></span></div><div className="text-right flex flex-col"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Net Total</p><p className="text-3xl font-black tracking-tighter">฿{(selectedOrder.totalAmount || 0).toLocaleString()}</p></div></div>
+                                {selectedOrder.notes && <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3 items-start"><p className="text-lg shrink-0 mt-0.5">📝</p><div><p className="text-[10px] uppercase font-black text-amber-700 tracking-wider mb-1">Customer Notes</p><p className="text-sm text-amber-900 leading-relaxed font-medium">{selectedOrder.notes}</p></div></div>}</div></>
+                              )}</DialogContent>
+                            </Dialog>
 
-                                {/* Status Timeline */}
-                                <OrderStatusTimeline status={selectedOrder.status} />
-                              </div>
-
-                              <div className="p-6 space-y-6">
-                                {/* Order Info Grid */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                  <div className="bg-gray-50 rounded-lg p-3">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <User className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">ลูกค้า</span>
-                                    </div>
-                                    <p className="font-semibold text-sm">{selectedOrder.customerName}</p>
-                                  </div>
-                                  <div className="bg-gray-50 rounded-lg p-3">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">LINE ID</span>
-                                    </div>
-                                    <p className="font-semibold text-sm font-mono">{selectedOrder.lineId}</p>
-                                  </div>
-                                  <div className="bg-gray-50 rounded-lg p-3">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <Store className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">Store</span>
-                                    </div>
-                                    <p className="font-semibold text-sm">{selectedOrder.lineAccount}</p>
-                                  </div>
-                                  <div className="bg-gray-50 rounded-lg p-3">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">วันที่สั่ง</span>
-                                    </div>
-                                    <p className="font-semibold text-sm">
-                                      {new Date(selectedOrder.orderDate).toLocaleDateString("th-TH", {
-                                        day: "numeric", month: "short", year: "numeric"
-                                      })}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                {/* Products Section */}
-                                <div>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <ShoppingBag className="h-4 w-4" />
-                                    <h3 className="font-semibold">รายการสินค้า ({selectedOrder.items.length} ประเภท)</h3>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    {selectedOrder.items.map((item, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="flex gap-4 items-center p-4 border border-border rounded-xl hover:bg-gray-50 transition-colors"
-                                      >
-                                        {/* Product Image */}
-                                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
-                                          <ImageWithFallback
-                                            src={item.imageUrl}
-                                            alt={item.productName}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </div>
-
-                                        {/* Product Info */}
-                                        <div className="flex-1 min-w-0">
-                                          <p className="font-semibold text-sm truncate">{item.productName}</p>
-                                          <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs text-muted-foreground font-mono">{item.sku}</span>
-                                            <span className="text-muted-foreground">·</span>
-                                            <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                              <Tag className="h-2.5 w-2.5 mr-1" />
-                                              {item.category}
-                                            </Badge>
-                                          </div>
-                                          <p className="text-xs text-muted-foreground mt-1">
-                                            ฿{item.unitPrice.toLocaleString()} × {item.quantity.toLocaleString()} ชิ้น
-                                          </p>
-                                        </div>
-
-                                        {/* Quantity Badge */}
-                                        <div className="text-center shrink-0">
-                                          <div className="bg-black text-white rounded-lg px-3 py-1.5 min-w-[60px]">
-                                            <p className="text-lg font-bold leading-none">{item.quantity.toLocaleString()}</p>
-                                            <p className="text-[10px] text-gray-300 mt-0.5">ชิ้น</p>
-                                          </div>
-                                        </div>
-
-                                        {/* Subtotal */}
-                                        <div className="text-right shrink-0">
-                                          <p className="font-bold text-sm">฿{item.subtotal.toLocaleString()}</p>
-                                          <p className="text-xs text-muted-foreground">ยอดรวม</p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Summary */}
-                                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                                  <h3 className="font-semibold text-sm">สรุปคำสั่งซื้อ</h3>
-                                  <div className="space-y-2">
-                                    {selectedOrder.items.map((item, idx) => (
-                                      <div key={idx} className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground truncate max-w-[60%]">{item.productName}</span>
-                                        <span>฿{item.subtotal.toLocaleString()}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-                                    <div>
-                                      <span className="text-sm text-muted-foreground">รวมทั้งหมด </span>
-                                      <span className="text-sm font-medium">{selectedOrder.quantity.toLocaleString()} ชิ้น</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-xs text-muted-foreground">ยอดสุทธิ</p>
-                                      <p className="text-2xl font-bold">฿{selectedOrder.totalAmount.toLocaleString()}</p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Notes */}
-                                {selectedOrder.notes && (
-                                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                                    <p className="text-xs font-semibold text-amber-700 mb-1">📝 หมายเหตุ</p>
-                                    <p className="text-sm text-amber-800">{selectedOrder.notes}</p>
-                                  </div>
+                            {/* EDIT ORDER */}
+                            <Dialog open={editingOrder?.id === order.id} onOpenChange={(open) => { if (!open) setEditingOrder(null); }}>
+                              <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-black hover:bg-gray-100" onClick={() => setEditingOrder(order)}><Edit className="h-4 w-4" /></Button></DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader><DialogTitle className="text-xl font-bold">Edit Order: {order.id}</DialogTitle></DialogHeader>
+                                {editingOrder && (
+                                  <OrderForm 
+                                    order={editingOrder}
+                                    customers={customers} 
+                                    products={products} 
+                                    onCancel={() => setEditingOrder(null)} 
+                                    onSubmit={handleUpdateOrder} 
+                                  />
                                 )}
-                              </div>
-                            </>
-                          )}
-                        </DialogContent>
-                      </Dialog>
+                              </DialogContent>
+                            </Dialog>
 
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                            {/* DELETE ORDER */}
+                            <Dialog open={deletingOrderId === order.id} onOpenChange={(open) => { if (!open) setDeletingOrderId(null); }}>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={() => setDeletingOrderId(order.id)} disabled={order.status !== "pending"} className="h-9 w-9 text-gray-400 hover:text-red-600 hover:bg-red-50">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-sm">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center gap-2 text-red-600 font-black uppercase text-base">
+                                    <AlertTriangle className="h-5 w-5" /> Confirm Delete
+                                  </DialogTitle>
+                                </DialogHeader>
+                                <div className="py-6 text-sm text-gray-600 leading-relaxed">
+                                  คุณแน่ใจหรือไม่ว่าต้องการลบคำสั่งซื้อ <span className="font-black text-black">{order.id}</span>? 
+                                  <p className="mt-3 text-xs italic text-gray-400 bg-gray-50 p-3 rounded-lg border border-gray-100">* ระบบจะทำการคืนสต็อกสินค้าให้ร้านค้าโดยอัตโนมัติ</p>
+                                </div>
+                                <DialogFooter className="gap-2 pt-2 border-t border-gray-50">
+                                  <Button type="button" variant="outline" onClick={() => setDeletingOrderId(null)} className="rounded-xl flex-1">Cancel</Button>
+                                  <Button type="button" className="bg-red-600 text-white hover:bg-red-700 border-0 rounded-xl flex-1 font-bold" onClick={handleDeleteOrder}>Delete Order</Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* Pagination UI */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-50">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 rounded-lg border-gray-100"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                      const isVisible = page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                      if (!isVisible && Math.abs(page - currentPage) === 2) return <span key={page} className="px-1 text-gray-300">...</span>;
+                      if (!isVisible) return null;
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          className={`h-8 w-8 p-0 rounded-lg text-xs font-bold transition-all ${
+                            currentPage === page ? "bg-black text-white" : "border-gray-100 text-gray-400 hover:text-black"
+                          }`}
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 rounded-lg border-gray-100"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
